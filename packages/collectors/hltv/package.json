@@ -1,0 +1,23 @@
+{
+  "name": "@gametime/collector-pandascore",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gametime/shared": "workspace:*",
+    "@gametime/db": "workspace:*",
+    "@gametime/cache": "workspace:*",
+    "@gametime/collector-base": "workspace:*",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

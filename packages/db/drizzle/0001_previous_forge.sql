@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "odds_format" varchar(20) DEFAULT 'decimal' NOT NULL;

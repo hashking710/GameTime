@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.env
+*.log
+logs/
+.DS_Store
+
+# Drizzle
+**/drizzle/meta/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+Thumbs.db
+Desktop.ini

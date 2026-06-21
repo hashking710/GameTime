@@ -1,0 +1,5 @@
+packages:
+  - "packages/*"
+  - "packages/collectors/*"
+allowBuilds:
+  esbuild: true

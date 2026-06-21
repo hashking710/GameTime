@@ -1,0 +1,161 @@
+name: gametime
+
+services:
+  # ── Infrastructure ──────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gametime
+      POSTGRES_PASSWORD: gametime
+      POSTGRES_DB: gametime
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gametime"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Migrations (run once, then exit) ────────────────────
+  migrate:
+    build:
+      context: .
+      dockerfile: packages/db/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://gametime:gametime@postgres:5432/gametime
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  # ── Discord Bot ─────────────────────────────────────────
+  bot:
+    build:
+      context: .
+      dockerfile: packages/bot/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "${WEBHOOK_PORT:-3000}:3000"
+    environment:
+      DATABASE_URL: postgresql://gametime:gametime@postgres:5432/gametime
+      REDIS_URL: redis://redis:6379
+      KOFI_VERIFICATION_TOKEN: ${KOFI_VERIFICATION_TOKEN:-}
+      KOFI_URL: ${KOFI_URL:-https://ko-fi.com/gametime}
+      WEBHOOK_PORT: 3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  # ── Match Collectors ────────────────────────────────────
+  collector-pandascore:
+    build:
+      context: .
+      dockerfile: packages/collectors/hltv/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://gametime:gametime@postgres:5432/gametime
+      REDIS_URL: redis://redis:6379
+      PANDASCORE_API_KEY: ${PANDASCORE_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  collector-opendota:
+    build:
+      context: .
+      dockerfile: packages/collectors/opendota/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://gametime:gametime@postgres:5432/gametime
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  collector-sportsdb:
+    build:
+      context: .
+      dockerfile: packages/collectors/sportsdb/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://gametime:gametime@postgres:5432/gametime
+      REDIS_URL: redis://redis:6379
+      SPORTSDB_API_KEY: ${SPORTSDB_API_KEY:-3}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  # ── Odds Collector ──────────────────────────────────────
+  collector-odds:
+    build:
+      context: .
+      dockerfile: packages/collectors/odds/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://gametime:gametime@postgres:5432/gametime
+      REDIS_URL: redis://redis:6379
+      PANDASCORE_API_KEY: ${PANDASCORE_API_KEY:-}
+      ODDS_API_KEY: ${ODDS_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  # ── Reminder Service ────────────────────────────────────
+  reminder:
+    build:
+      context: .
+      dockerfile: packages/reminder/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://gametime:gametime@postgres:5432/gametime
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  pg_data:
+  redis_data:

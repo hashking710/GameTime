@@ -1,0 +1,1 @@
+export { BaseCollector } from "./collector";

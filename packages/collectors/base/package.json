@@ -1,0 +1,30 @@
+{
+  "name": "@gametime/collector-base",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gametime/shared": "workspace:*",
+    "@gametime/db": "workspace:*",
+    "@gametime/cache": "workspace:*",
+    "drizzle-orm": "^0.39.0",
+    "node-cron": "^3.0.3",
+    "pino": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/node-cron": "^3.0.11",
+    "typescript": "^5.7.0"
+  }
+}
