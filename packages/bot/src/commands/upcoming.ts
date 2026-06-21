@@ -8,6 +8,7 @@ import { getOrSet, CacheKeys, CacheTTL } from "@gametime/cache";
 import { isValidGame, type OddsFormat } from "@gametime/shared";
 import { buildMatchEmbed, buildMatchWithOddsEmbed } from "../utils/embeds";
 import { getUserTier } from "../utils/tier";
+import { sendPaginated } from "../utils/pagination";
 
 export default {
   data: new SlashCommandBuilder()
@@ -50,7 +51,7 @@ export default {
           .from(matches)
           .where(and(...conditions))
           .orderBy(asc(matches.startTime))
-          .limit(10);
+          .limit(25);
       },
       CacheTTL.UPCOMING,
     );
@@ -61,8 +62,8 @@ export default {
     }
 
     if (!tier.hasOdds) {
-      const embeds = upcomingMatches.slice(0, 10).map(buildMatchEmbed);
-      await interaction.editReply({ embeds });
+      const embeds = upcomingMatches.map(buildMatchEmbed);
+      await sendPaginated(interaction, embeds);
       return;
     }
 
@@ -84,12 +85,10 @@ export default {
 
     const oddsByMatch = Map.groupBy(allOdds, (o) => o.matchId);
 
-    const embeds = upcomingMatches
-      .slice(0, 10)
-      .map((match) =>
-        buildMatchWithOddsEmbed(match, oddsByMatch.get(match.id) ?? [], oddsFormat),
-      );
+    const embeds = upcomingMatches.map((match) =>
+      buildMatchWithOddsEmbed(match, oddsByMatch.get(match.id) ?? [], oddsFormat),
+    );
 
-    await interaction.editReply({ embeds });
+    await sendPaginated(interaction, embeds);
   },
 };

@@ -5,6 +5,7 @@ import {
 import { eq, gte, and, asc } from "drizzle-orm";
 import { matches } from "@gametime/db";
 import { buildMatchEmbed } from "../utils/embeds";
+import { sendPaginated } from "../utils/pagination";
 
 export default {
   data: new SlashCommandBuilder()
@@ -46,7 +47,7 @@ export default {
         ),
       )
       .orderBy(asc(matches.startTime))
-      .limit(10);
+      .limit(25);
 
     if (upcoming.length === 0) {
       await interaction.editReply(
@@ -56,6 +57,6 @@ export default {
     }
 
     const embeds = upcoming.map(buildMatchEmbed);
-    await interaction.editReply({ embeds });
+    await sendPaginated(interaction, embeds);
   },
 };

@@ -6,6 +6,7 @@ import { and, gte, lt, asc } from "drizzle-orm";
 import { matches } from "@gametime/db";
 import { getOrSet, CacheKeys, CacheTTL } from "@gametime/cache";
 import { buildMatchEmbed } from "../utils/embeds";
+import { sendPaginated } from "../utils/pagination";
 
 export default {
   data: new SlashCommandBuilder()
@@ -37,7 +38,8 @@ export default {
               lt(matches.startTime, endOfDay),
             ),
           )
-          .orderBy(asc(matches.startTime));
+          .orderBy(asc(matches.startTime))
+          .limit(50);
       },
       CacheTTL.TODAY,
     );
@@ -47,7 +49,7 @@ export default {
       return;
     }
 
-    const embeds = todayMatches.slice(0, 10).map(buildMatchEmbed);
-    await interaction.editReply({ embeds });
+    const embeds = todayMatches.map(buildMatchEmbed);
+    await sendPaginated(interaction, embeds);
   },
 };
