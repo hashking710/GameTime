@@ -15,8 +15,19 @@ export default {
     .addStringOption((opt) =>
       opt
         .setName("game")
-        .setDescription("Filter by game (e.g. cs2, nba)")
-        .setRequired(false),
+        .setDescription("Filter by game")
+        .setRequired(false)
+        .addChoices(
+          { name: "CS2", value: "cs2" },
+          { name: "Valorant", value: "valorant" },
+          { name: "Dota 2", value: "dota2" },
+          { name: "NFL", value: "nfl" },
+          { name: "NBA", value: "nba" },
+          { name: "MLB", value: "mlb" },
+          { name: "NHL", value: "nhl" },
+          { name: "Soccer", value: "soccer" },
+          { name: "UFC", value: "ufc" },
+        ),
     ) as SlashCommandBuilder,
 
   async execute(interaction: ChatInputCommandInteraction) {
@@ -26,10 +37,6 @@ export default {
 
     const { db } = interaction.client;
     const gameFilter = interaction.options.getString("game");
-    if (gameFilter && !isValidGame(gameFilter)) {
-      await interaction.editReply(`Invalid game "${gameFilter}". Try: cs2, valorant, lol, dota2, nfl, nba, mlb, nhl, soccer, ufc, f1, tennis`);
-      return;
-    }
 
     const conditions = [
       eq(matches.status, "upcoming"),

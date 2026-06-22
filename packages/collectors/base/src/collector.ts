@@ -1,7 +1,7 @@
 import type { UnifiedMatch } from "@gametime/shared";
 import { createLogger } from "@gametime/shared";
 import type { Database } from "@gametime/db";
-import { matches, teams } from "@gametime/db";
+import { matches, teams, teamAliases } from "@gametime/db";
 import type { RedisClient } from "@gametime/cache";
 import { sql, eq, and, lte } from "drizzle-orm";
 import { invalidatePattern } from "@gametime/cache";
@@ -52,7 +52,7 @@ export abstract class BaseCollector {
           startTime: match.startTime,
           status: match.status,
           streamUrl: match.streamUrl,
-          details: match.details ?? null,
+          details: (match.details as Record<string, unknown>) ?? null,
           source: match.source,
           sourceId: match.sourceId,
         })
@@ -85,10 +85,13 @@ export abstract class BaseCollector {
         if (seen.has(key)) continue;
         seen.add(key);
 
+        const canonical = await this.resolveCanonical(teamName);
+
         await this.db
           .insert(teams)
           .values({
             name: teamName,
+            canonicalName: canonical,
             game: match.game,
             source: match.source,
             sourceId: `${match.source}_team_${teamName.toLowerCase().replace(/\s+/g, "_")}`,
@@ -96,6 +99,20 @@ export abstract class BaseCollector {
           .onConflictDoNothing();
       }
     }
+  }
+
+  private async resolveCanonical(name: string): Promise<string> {
+    const normalized = name.toLowerCase().trim();
+
+    const alias = await this.db
+      .select({ canonicalName: teamAliases.canonicalName })
+      .from(teamAliases)
+      .where(sql`LOWER(${teamAliases.alias}) = ${normalized}`)
+      .limit(1);
+
+    if (alias.length > 0) return alias[0].canonicalName;
+
+    return name;
   }
 
   async updateMatchLifecycle(): Promise<void> {

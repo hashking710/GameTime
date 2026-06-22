@@ -1,4 +1,4 @@
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 RUN corepack enable pnpm
 WORKDIR /app
 
@@ -24,7 +24,7 @@ RUN pnpm --filter @gametime/shared build \
  && pnpm --filter @gametime/collector-base build \
  && pnpm --filter @gametime/collector-vlr build
 
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 RUN corepack enable pnpm
 WORKDIR /app
 

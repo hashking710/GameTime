@@ -102,7 +102,7 @@ export async function updateLiveScores(db: Database, redis: RedisClient): Promis
             team1Score: homeScore,
             team2Score: awayScore,
             status: matchStatus,
-            details,
+            details: details as Record<string, unknown>,
             updatedAt: new Date(),
           })
           .where(
@@ -128,7 +128,7 @@ export async function updateLiveScores(db: Database, redis: RedisClient): Promis
               team1Score: awayScore,
               team2Score: homeScore,
               status: matchStatus,
-              details,
+              details: details as Record<string, unknown>,
               updatedAt: new Date(),
             })
             .where(

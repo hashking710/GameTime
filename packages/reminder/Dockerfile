@@ -1,4 +1,4 @@
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 RUN corepack enable pnpm
 WORKDIR /app
 
@@ -6,9 +6,17 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 COPY packages/shared/package.json packages/shared/
 COPY packages/db/package.json packages/db/
 COPY packages/cache/package.json packages/cache/
+COPY packages/bot/package.json packages/bot/
+COPY packages/collectors/base/package.json packages/collectors/base/
+COPY packages/collectors/hltv/package.json packages/collectors/hltv/
+COPY packages/collectors/vlr/package.json packages/collectors/vlr/
+COPY packages/collectors/riot/package.json packages/collectors/riot/
+COPY packages/collectors/opendota/package.json packages/collectors/opendota/
+COPY packages/collectors/sportsdb/package.json packages/collectors/sportsdb/
+COPY packages/collectors/odds/package.json packages/collectors/odds/
 COPY packages/reminder/package.json packages/reminder/
 
-RUN pnpm install --frozen-lockfile
+RUN pnpm install
 
 COPY tsconfig.base.json ./
 COPY packages/shared/ packages/shared/
@@ -16,21 +24,30 @@ COPY packages/db/ packages/db/
 COPY packages/cache/ packages/cache/
 COPY packages/reminder/ packages/reminder/
 
-RUN pnpm --filter @gametime/shared build \
- && pnpm --filter @gametime/db build \
- && pnpm --filter @gametime/cache build \
- && pnpm --filter @gametime/reminder build
+RUN mkdir -p node_modules/@gametime \
+ && ln -sf /app/packages/shared node_modules/@gametime/shared \
+ && ln -sf /app/packages/db node_modules/@gametime/db \
+ && ln -sf /app/packages/cache node_modules/@gametime/cache
 
-FROM node:20-alpine AS runner
-RUN corepack enable pnpm
+RUN node node_modules/typescript/bin/tsc -p packages/shared/tsconfig.json \
+ && node node_modules/typescript/bin/tsc -p packages/db/tsconfig.json \
+ && node node_modules/typescript/bin/tsc -p packages/cache/tsconfig.json \
+ && node node_modules/typescript/bin/tsc -p packages/reminder/tsconfig.json
+
+FROM node:22-alpine AS runner
 WORKDIR /app
-
-COPY --from=builder /app/package.json /app/pnpm-workspace.yaml /app/pnpm-lock.yaml /app/.npmrc ./
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/packages/shared/ ./packages/shared/
-COPY --from=builder /app/packages/db/ ./packages/db/
-COPY --from=builder /app/packages/cache/ ./packages/cache/
-COPY --from=builder /app/packages/reminder/ ./packages/reminder/
-
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder /app/packages/shared/package.json ./packages/shared/
+COPY --from=builder /app/packages/db/dist ./packages/db/dist
+COPY --from=builder /app/packages/db/package.json ./packages/db/
+COPY --from=builder /app/packages/cache/dist ./packages/cache/dist
+COPY --from=builder /app/packages/cache/package.json ./packages/cache/
+COPY --from=builder /app/packages/reminder/dist ./packages/reminder/dist
+COPY --from=builder /app/packages/reminder/package.json ./packages/reminder/
+RUN mkdir -p node_modules/@gametime \
+ && ln -sf /app/packages/shared node_modules/@gametime/shared \
+ && ln -sf /app/packages/db node_modules/@gametime/db \
+ && ln -sf /app/packages/cache node_modules/@gametime/cache
 WORKDIR /app/packages/reminder
-CMD ["node", "dist/index.js"]
+CMD ["node", "--import", "tsx", "dist/index.js"]

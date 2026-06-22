@@ -24,13 +24,22 @@ export default {
     const { db } = interaction.client;
 
     const results = await db
-      .select()
+      .selectDistinctOn([teams.canonicalName], {
+        id: teams.id,
+        name: sql<string>`COALESCE(${teams.canonicalName}, ${teams.name})`.as("display_name"),
+        game: teams.game,
+      })
       .from(teams)
-      .where(sql`${teams.name} ILIKE ${"%" + focused + "%"}`)
+      .where(
+        sql`(${teams.name} ILIKE ${"%" + focused + "%"} OR ${teams.canonicalName} ILIKE ${"%" + focused + "%"})`,
+      )
       .limit(25);
 
     await interaction.respond(
-      results.map((t) => ({ name: `${t.name} (${t.game})`, value: t.id })),
+      results.map((t) => ({
+        name: `${t.name} (${t.game})`.slice(0, 100),
+        value: t.id,
+      })),
     );
   },
 
@@ -40,13 +49,11 @@ export default {
     const teamId = interaction.options.getString("team", true);
     const discordId = interaction.user.id;
 
-    // Ensure user exists
     await db
       .insert(users)
       .values({ discordId })
       .onConflictDoNothing();
 
-    // Check tier limits
     const tier = await getUserTier(interaction);
     const existingSubs = await db
       .select()
@@ -60,14 +67,12 @@ export default {
       return;
     }
 
-    // Check if already tracking
     const existing = existingSubs.find((s) => s.teamId === teamId);
     if (existing) {
       await interaction.editReply("You're already tracking this team!");
       return;
     }
 
-    // Create subscription
     await db.insert(userSubscriptions).values({ discordId, teamId });
 
     const team = await db
@@ -76,8 +81,9 @@ export default {
       .where(eq(teams.id, teamId))
       .limit(1);
 
+    const displayName = team[0]?.canonicalName ?? team[0]?.name ?? "Unknown";
     await interaction.editReply(
-      `Now tracking **${team[0]?.name ?? "Unknown"}**! You'll be notified before their matches.`,
+      `Now tracking **${displayName}**! You'll be notified before their matches across all games.`,
     );
   },
 };

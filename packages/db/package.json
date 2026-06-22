@@ -12,10 +12,11 @@
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "pnpm exec tsc",
     "dev": "tsc -b --watch",
     "generate": "drizzle-kit generate",
     "migrate": "tsx src/migrate.ts",
+    "seed-aliases": "tsx src/seed-aliases.ts",
     "studio": "drizzle-kit studio",
     "typecheck": "tsc --noEmit"
   },

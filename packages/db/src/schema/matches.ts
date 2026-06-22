@@ -9,7 +9,7 @@ import {
   uniqueIndex,
   index,
 } from "drizzle-orm/pg-core";
-import type { MatchDetails } from "@gametime/shared";
+type MatchDetails = Record<string, unknown>;
 
 export const matchStatusEnum = pgEnum("match_status", [
   "upcoming",

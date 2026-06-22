@@ -38,7 +38,12 @@ export async function findPendingNotifications(
     .from(matches)
     .innerJoin(
       teams,
-      sql`(${matches.team1} ILIKE '%' || ${teams.name} || '%' OR ${matches.team2} ILIKE '%' || ${teams.name} || '%') AND ${teams.game} = ${matches.game}`,
+      sql`(
+        ${matches.team1} ILIKE '%' || ${teams.name} || '%'
+        OR ${matches.team2} ILIKE '%' || ${teams.name} || '%'
+        OR ${matches.team1} ILIKE '%' || ${teams.canonicalName} || '%'
+        OR ${matches.team2} ILIKE '%' || ${teams.canonicalName} || '%'
+      ) AND ${teams.game} = ${matches.game}`,
     )
     .innerJoin(userSubscriptions, eq(userSubscriptions.teamId, teams.id))
     .where(
