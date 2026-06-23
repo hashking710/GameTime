@@ -13,6 +13,7 @@ import { buildMatchEmbed } from "../utils/embeds";
 
 const UPDATE_INTERVAL_MS = 30_000;
 const MAX_DURATION_MS = 2 * 60 * 60 * 1000;
+const PAGE_SIZE = 5;
 
 export default {
   data: new SlashCommandBuilder()
@@ -23,34 +24,67 @@ export default {
     await interaction.deferReply();
     const { db } = interaction.client;
 
-    const liveMatches = await fetchLiveMatches(db);
+    let allLive = await fetchLiveMatches(db);
 
-    if (liveMatches.length === 0) {
+    if (allLive.length === 0) {
       await interaction.editReply("No matches are live right now.");
       return;
     }
 
-    const stopButton = new ButtonBuilder()
-      .setCustomId("live_stop")
-      .setLabel("Stop Updates")
-      .setStyle(ButtonStyle.Secondary);
-
-    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(stopButton);
-
-    const embeds = liveMatches.slice(0, 9).map(buildMatchEmbed);
-    const footer = buildFooterEmbed(liveMatches.length);
-
-    const message = await interaction.editReply({
-      embeds: [...embeds, footer],
-      components: [row],
-    });
-
+    let page = 0;
     const startTime = Date.now();
     let stopped = false;
+
+    function getPage(data: typeof allLive) {
+      const totalPages = Math.max(1, Math.ceil(data.length / PAGE_SIZE));
+      if (page >= totalPages) page = totalPages - 1;
+      const slice = data.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+      return { slice, totalPages };
+    }
+
+    function buildComponents(totalPages: number) {
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId("live_prev")
+          .setLabel("Previous")
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(page === 0),
+        new ButtonBuilder()
+          .setCustomId("live_page")
+          .setLabel(`${page + 1} / ${totalPages}`)
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(true),
+        new ButtonBuilder()
+          .setCustomId("live_next")
+          .setLabel("Next")
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(page >= totalPages - 1),
+        new ButtonBuilder()
+          .setCustomId("live_stop")
+          .setLabel("Stop")
+          .setStyle(ButtonStyle.Danger),
+      );
+      return [row];
+    }
+
+    function buildMessage(data: typeof allLive) {
+      const { slice, totalPages } = getPage(data);
+      const embeds = slice.map(buildMatchEmbed);
+      const footer = new EmbedBuilder()
+        .setColor(0x2ecc71)
+        .setFooter({
+          text: `${data.length} live match${data.length !== 1 ? "es" : ""} · Page ${page + 1}/${totalPages} · Auto-updating every 30s`,
+        })
+        .setTimestamp();
+      return { embeds: [...embeds, footer], components: buildComponents(totalPages) };
+    }
+
+    const message = await interaction.editReply(buildMessage(allLive));
 
     const collector = message.createMessageComponentCollector({
       componentType: ComponentType.Button,
       filter: (i) => i.user.id === interaction.user.id,
+      time: MAX_DURATION_MS,
     });
 
     collector.on("collect", async (i) => {
@@ -58,11 +92,20 @@ export default {
         stopped = true;
         clearInterval(interval);
         collector.stop();
-        await i.update({
-          embeds: [...embeds, buildStoppedEmbed()],
-          components: [],
-        });
+        const { slice } = getPage(allLive);
+        const embeds = slice.map(buildMatchEmbed);
+        const footer = new EmbedBuilder()
+          .setColor(0x95a5a6)
+          .setFooter({ text: "Live updates stopped" })
+          .setTimestamp();
+        await i.update({ embeds: [...embeds, footer], components: [] });
+        return;
       }
+
+      if (i.customId === "live_next") page++;
+      if (i.customId === "live_prev") page--;
+
+      await i.update(buildMessage(allLive));
     });
 
     const interval = setInterval(async () => {
@@ -70,10 +113,13 @@ export default {
         clearInterval(interval);
         collector.stop();
         try {
-          await interaction.editReply({
-            embeds: [...embeds, buildExpiredEmbed()],
-            components: [],
-          });
+          const { slice } = getPage(allLive);
+          const embeds = slice.map(buildMatchEmbed);
+          const footer = new EmbedBuilder()
+            .setColor(0x95a5a6)
+            .setFooter({ text: "Live updates expired after 2 hours" })
+            .setTimestamp();
+          await interaction.editReply({ embeds: [...embeds, footer], components: [] });
         } catch {}
         return;
       }
@@ -84,19 +130,16 @@ export default {
         if (updated.length === 0) {
           clearInterval(interval);
           collector.stop();
-          await interaction.editReply({
-            embeds: [buildNoMoreLiveEmbed()],
-            components: [],
-          });
+          const footer = new EmbedBuilder()
+            .setColor(0x95a5a6)
+            .setDescription("All live matches have ended.")
+            .setTimestamp();
+          await interaction.editReply({ embeds: [footer], components: [] });
           return;
         }
 
-        const updatedEmbeds = updated.slice(0, 9).map(buildMatchEmbed);
-        const updatedFooter = buildFooterEmbed(updated.length);
-        await interaction.editReply({
-          embeds: [...updatedEmbeds, updatedFooter],
-          components: [row],
-        });
+        allLive = updated;
+        await interaction.editReply(buildMessage(allLive));
       } catch {}
     }, UPDATE_INTERVAL_MS);
   },
@@ -108,32 +151,4 @@ async function fetchLiveMatches(db: any) {
     .from(matches)
     .where(eq(matches.status, "live"))
     .orderBy(asc(matches.game));
-}
-
-function buildFooterEmbed(count: number): EmbedBuilder {
-  return new EmbedBuilder()
-    .setColor(0x2ecc71)
-    .setFooter({ text: `${count} live match${count !== 1 ? "es" : ""} · Auto-updating every 30s` })
-    .setTimestamp();
-}
-
-function buildStoppedEmbed(): EmbedBuilder {
-  return new EmbedBuilder()
-    .setColor(0x95a5a6)
-    .setFooter({ text: "Live updates stopped" })
-    .setTimestamp();
-}
-
-function buildExpiredEmbed(): EmbedBuilder {
-  return new EmbedBuilder()
-    .setColor(0x95a5a6)
-    .setFooter({ text: "Live updates expired after 2 hours" })
-    .setTimestamp();
-}
-
-function buildNoMoreLiveEmbed(): EmbedBuilder {
-  return new EmbedBuilder()
-    .setColor(0x95a5a6)
-    .setDescription("All live matches have ended.")
-    .setTimestamp();
 }
