@@ -3,7 +3,7 @@ import { createLogger, type Game } from "@gametime/shared";
 import type { Database } from "@gametime/db";
 import { matches, teams, teamAliases } from "@gametime/db";
 import type { RedisClient } from "@gametime/cache";
-import { sql, eq, and, lte } from "drizzle-orm";
+import { sql, eq, and, lte, gte } from "drizzle-orm";
 import { invalidatePattern } from "@gametime/cache";
 import cron from "node-cron";
 
@@ -131,11 +131,18 @@ export abstract class BaseCollector {
   async updateMatchLifecycle(): Promise<void> {
     const now = new Date();
 
+    // Only promote to live if start_time is within the last 6 hours
+    // Prevents future series games from being incorrectly marked live
+    const liveWindow = new Date(now.getTime() - 6 * 3600_000);
     const promoted = await this.db
       .update(matches)
       .set({ status: "live", updatedAt: now })
       .where(
-        and(eq(matches.status, "upcoming"), lte(matches.startTime, now)),
+        and(
+          eq(matches.status, "upcoming"),
+          lte(matches.startTime, now),
+          gte(matches.startTime, liveWindow),
+        ),
       )
       .returning({ id: matches.id });
 
