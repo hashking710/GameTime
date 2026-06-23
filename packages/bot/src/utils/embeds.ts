@@ -167,8 +167,11 @@ function formatSubGames(
   return games
     .map((g) => {
       const label = `Map ${g.position}`;
-      const effectiveStatus = matchCompleted && g.status === "running" ? "finished" : g.status;
-      if (effectiveStatus === "not_started") return `${label}: -`;
+      const effectiveStatus = matchCompleted && (g.status === "running" || g.status === "not_started")
+        ? "finished"
+        : g.status;
+
+      if (!matchCompleted && effectiveStatus === "not_started") return `${label}: -`;
       if (effectiveStatus === "running") return `${label}: :red_circle: **LIVE**`;
 
       const winner = g.winnerName;
