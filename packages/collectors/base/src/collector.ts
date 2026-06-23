@@ -7,6 +7,10 @@ import { sql, eq, and, lte } from "drizzle-orm";
 import { invalidatePattern } from "@gametime/cache";
 import cron from "node-cron";
 
+// Only traditional sports get time-based completion promotion.
+// Esports (cs2, valorant, lol, dota2) rely on PandaScore/VLR/OpenDota
+// to report completion — the lifecycle promoter was overriding their
+// status before final scores were available.
 const GAME_DURATION_HOURS: Partial<Record<Game, number>> = {
   nfl: 4,
   nba: 3,
@@ -16,10 +20,6 @@ const GAME_DURATION_HOURS: Partial<Record<Game, number>> = {
   ufc: 5,
   f1: 3,
   tennis: 5,
-  cs2: 5,
-  valorant: 5,
-  lol: 5,
-  dota2: 5,
 };
 
 const MAX_RETRIES = 3;

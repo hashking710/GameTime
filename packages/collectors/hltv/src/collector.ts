@@ -75,7 +75,7 @@ export class PandaScoreMatchCollector extends BaseCollector {
     const endpoints = [
       "matches/upcoming?per_page=100",
       "matches/running?per_page=50",
-      "matches/past?per_page=50&sort=-begin_at",
+      "matches/past?per_page=100&sort=-begin_at",
     ];
 
     for (const endpoint of endpoints) {
