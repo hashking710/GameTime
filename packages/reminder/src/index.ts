@@ -8,6 +8,7 @@ import { sendNotifications } from "./notifier";
 import { sendDailyDigests } from "./digest";
 import { checkUpsetAlerts, checkLineMovementAlerts } from "./alerts";
 import { cleanupStaleData } from "./cleanup";
+import { checkWatchedMatches } from "./watch-notifier";
 
 const env = loadEnv(
   z.object({
@@ -53,6 +54,15 @@ client.once("clientReady", () => {
       await checkLineMovementAlerts(db, client, sentCache);
     } catch (err) {
       logger.error({ err }, "Line movement alert cycle failed");
+    }
+  });
+
+  // Watched match notifications — every 2 minutes
+  cron.schedule("*/2 * * * *", async () => {
+    try {
+      await checkWatchedMatches(db, client, sentCache);
+    } catch (err) {
+      logger.error({ err }, "Watch notifier cycle failed");
     }
   });
 

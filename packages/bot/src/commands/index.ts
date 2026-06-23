@@ -16,6 +16,7 @@ import settingsCommand from "./settings";
 import subscribeCommand from "./subscribe";
 import helpCommand from "./help";
 import resultsCommand from "./results";
+import matchCommand from "./match";
 
 export interface Command {
   data: SlashCommandBuilder;
@@ -37,5 +38,6 @@ export function loadCommands(): Command[] {
     subscribeCommand,
     helpCommand,
     resultsCommand,
+    matchCommand,
   ];
 }
