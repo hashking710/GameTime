@@ -1,7 +1,7 @@
 import { createLogger } from "@gametime/shared";
 import type { UnifiedOdds } from "@gametime/shared";
 import type { Database } from "@gametime/db";
-import { odds, oddsHistory, matches } from "@gametime/db";
+import { odds, oddsHistory, matches, teams, teamAliases } from "@gametime/db";
 import type { RedisClient } from "@gametime/cache";
 import { eq, and, sql } from "drizzle-orm";
 import { invalidatePattern } from "@gametime/cache";
@@ -60,6 +60,20 @@ export class OddsCollector {
               updatedAt: sql`NOW()`,
             },
           });
+
+        for (const teamName of [o.matchInfo.team1Name, o.matchInfo.team2Name]) {
+          if (!teamName) continue;
+          await this.db
+            .insert(teams)
+            .values({
+              name: teamName,
+              canonicalName: teamName,
+              game: o.game,
+              source: o.matchSource,
+              sourceId: `${o.matchSource}_team_${teamName.toLowerCase().replace(/\s+/g, "_")}`,
+            })
+            .onConflictDoNothing();
+        }
       }
 
       const matchRows = await this.db

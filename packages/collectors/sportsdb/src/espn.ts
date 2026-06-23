@@ -1,5 +1,5 @@
 import { eq, and, sql } from "drizzle-orm";
-import { matches } from "@gametime/db";
+import { matches, teams, teamAliases } from "@gametime/db";
 import type { Database } from "@gametime/db";
 import type { RedisClient } from "@gametime/cache";
 import { invalidatePattern } from "@gametime/cache";
@@ -187,6 +187,9 @@ export async function updateLiveScores(db: Database, redis: RedisClient): Promis
           }
         }
 
+        await upsertEspnTeam(db, home.team.displayName, game);
+        await upsertEspnTeam(db, away.team.displayName, game);
+
         totalUpdated++;
       }
     } catch (err) {
@@ -198,4 +201,32 @@ export async function updateLiveScores(db: Database, redis: RedisClient): Promis
     await invalidatePattern(redis, "matches:*");
     logger.info({ updated: totalUpdated }, "ESPN live scores updated");
   }
+}
+
+const seenTeams = new Set<string>();
+
+async function upsertEspnTeam(db: Database, name: string, game: Game): Promise<void> {
+  if (!name) return;
+  const key = `espn:${game}:${name}`;
+  if (seenTeams.has(key)) return;
+  seenTeams.add(key);
+
+  let canonical = name;
+  const alias = await db
+    .select({ canonicalName: teamAliases.canonicalName })
+    .from(teamAliases)
+    .where(sql`LOWER(${teamAliases.alias}) = ${name.toLowerCase()}`)
+    .limit(1);
+  if (alias.length > 0) canonical = alias[0].canonicalName;
+
+  await db
+    .insert(teams)
+    .values({
+      name,
+      canonicalName: canonical,
+      game,
+      source: "espn",
+      sourceId: `espn_team_${name.toLowerCase().replace(/\s+/g, "_")}`,
+    })
+    .onConflictDoNothing();
 }

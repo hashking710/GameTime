@@ -14,7 +14,7 @@ export default {
     .setDescription("Show today's matches across all sports") as SlashCommandBuilder,
 
   async execute(interaction: ChatInputCommandInteraction) {
-    await interaction.deferReply();
+    await interaction.deferReply({ ephemeral: true });
     const { db, redis } = interaction.client;
 
     const todayMatches = await getOrSet(

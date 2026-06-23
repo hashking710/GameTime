@@ -21,7 +21,7 @@ export default {
     .setDescription("Show currently live matches (auto-updating scores)") as SlashCommandBuilder,
 
   async execute(interaction: ChatInputCommandInteraction) {
-    await interaction.deferReply();
+    await interaction.deferReply({ ephemeral: true });
     const { db } = interaction.client;
 
     let allLive = await fetchLiveMatches(db);
