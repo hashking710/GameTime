@@ -93,6 +93,7 @@ export async function updateLiveScores(db: Database, redis: RedisClient): Promis
         const details: MatchDetails = {
           clock: comp.status.type.shortDetail,
           situation: comp.status.type.description,
+          externalEventId: event.id,
         };
 
         const homeLine = home.linescores;

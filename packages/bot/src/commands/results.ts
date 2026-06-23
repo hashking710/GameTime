@@ -6,41 +6,32 @@ import { eq, and, desc } from "drizzle-orm";
 import { matches } from "@gametime/db";
 import { buildMatchEmbed } from "../utils/embeds";
 import { deduplicateMatches } from "../utils/dedup";
+import { parseGameOption } from "../utils/game";
 import { sendPaginated } from "../utils/pagination";
+import { withGameChoices } from "../utils/command-options";
+import { noMatchesMessage, unsupportedGameFilterMessage } from "../utils/command-messages";
 
 export default {
   data: new SlashCommandBuilder()
     .setName("results")
     .setDescription("Recent match results")
     .addStringOption((opt) =>
-      opt
-        .setName("game")
-        .setDescription("Filter by game")
-        .setRequired(false)
-        .addChoices(
-          { name: "CS2", value: "cs2" },
-          { name: "Valorant", value: "valorant" },
-          { name: "League of Legends", value: "lol" },
-          { name: "Dota 2", value: "dota2" },
-          { name: "NFL", value: "nfl" },
-          { name: "NBA", value: "nba" },
-          { name: "MLB", value: "mlb" },
-          { name: "NHL", value: "nhl" },
-          { name: "Soccer", value: "soccer" },
-          { name: "UFC", value: "ufc" },
-          { name: "F1", value: "f1" },
-          { name: "Tennis", value: "tennis" },
-        ),
+      withGameChoices(opt, { required: false }),
     ) as SlashCommandBuilder,
 
   async execute(interaction: ChatInputCommandInteraction) {
     await interaction.deferReply({ ephemeral: true });
     const { db } = interaction.client;
-    const gameFilter = interaction.options.getString("game");
+    const rawGameFilter = interaction.options.getString("game");
+    const gameFilter = parseGameOption(rawGameFilter);
+    if (rawGameFilter && !gameFilter) {
+      await interaction.editReply(unsupportedGameFilterMessage(rawGameFilter));
+      return;
+    }
 
     const conditions = [eq(matches.status, "completed")];
     if (gameFilter) {
-      conditions.push(eq(matches.game, gameFilter as any));
+      conditions.push(eq(matches.game, gameFilter));
     }
 
     const completed = await db
@@ -53,7 +44,7 @@ export default {
     const deduped = deduplicateMatches(completed);
 
     if (deduped.length === 0) {
-      await interaction.editReply("No recent results found.");
+      await interaction.editReply(noMatchesMessage("results"));
       return;
     }
 

@@ -8,6 +8,8 @@ import { getOrSet, CacheKeys, CacheTTL } from "@gametime/cache";
 import { buildMatchEmbed } from "../utils/embeds";
 import { sendPaginated } from "../utils/pagination";
 import { deduplicateMatches } from "../utils/dedup";
+import { noMatchesMessage } from "../utils/command-messages";
+import { loadUserMatchPreferences, sortMatchesByPreferences } from "../utils/match-preferences";
 
 export default {
   data: new SlashCommandBuilder()
@@ -46,13 +48,15 @@ export default {
     );
 
     const dedupedMatches = deduplicateMatches(todayMatches);
+    const preferences = await loadUserMatchPreferences(db, interaction.user.id);
+    const sortedMatches = sortMatchesByPreferences(dedupedMatches, preferences);
 
-    if (dedupedMatches.length === 0) {
-      await interaction.editReply("No matches scheduled for today.");
+    if (sortedMatches.length === 0) {
+      await interaction.editReply(noMatchesMessage("today"));
       return;
     }
 
-    const embeds = dedupedMatches.map(buildMatchEmbed);
+    const embeds = sortedMatches.map(buildMatchEmbed);
     await sendPaginated(interaction, embeds);
   },
 };

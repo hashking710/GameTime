@@ -43,6 +43,33 @@ interface PinnacleMarketPrice {
   type: string;
 }
 
+async function parseJsonSafely<T>(
+  response: Response,
+  context: Record<string, unknown>,
+): Promise<T | null> {
+  const body = await response.text();
+
+  if (!body.trim()) {
+    logger.warn({ ...context, status: response.status }, "Empty Pinnacle response body");
+    return null;
+  }
+
+  try {
+    return JSON.parse(body) as T;
+  } catch (err) {
+    logger.warn(
+      {
+        ...context,
+        err,
+        status: response.status,
+        preview: body.slice(0, 200),
+      },
+      "Invalid Pinnacle JSON response",
+    );
+    return null;
+  }
+}
+
 export async function fetchPinnacleOdds(): Promise<UnifiedOdds[]> {
   const results: UnifiedOdds[] = [];
 
@@ -57,7 +84,11 @@ export async function fetchPinnacleOdds(): Promise<UnifiedOdds[]> {
       );
       if (!leaguesRes.ok) continue;
 
-      const leagues = (await leaguesRes.json()) as PinnacleLeague[];
+      const leagues = await parseJsonSafely<PinnacleLeague[]>(leaguesRes, {
+        sportId,
+        step: "leagues",
+      });
+      if (!leagues) continue;
       const activeLeagues = leagues
         .filter((l) => l.matchupCount > 0)
         .slice(0, 5);
@@ -70,7 +101,15 @@ export async function fetchPinnacleOdds(): Promise<UnifiedOdds[]> {
           );
           if (!matchupsRes.ok) continue;
 
-          const matchups = (await matchupsRes.json()) as PinnacleMatchup[];
+          const matchups = await parseJsonSafely<PinnacleMatchup[]>(
+            matchupsRes,
+            {
+              sportId,
+              leagueId: league.id,
+              step: "matchups",
+            },
+          );
+          if (!matchups) continue;
 
           // Step 3: Get market prices
           const matchupIds = matchups
@@ -84,7 +123,16 @@ export async function fetchPinnacleOdds(): Promise<UnifiedOdds[]> {
           );
           if (!pricesRes.ok) continue;
 
-          const prices = (await pricesRes.json()) as PinnacleMarketPrice[];
+          const prices = await parseJsonSafely<PinnacleMarketPrice[]>(
+            pricesRes,
+            {
+              sportId,
+              leagueId: league.id,
+              matchupCount: matchupIds.length,
+              step: "prices",
+            },
+          );
+          if (!prices) continue;
 
           // Map matchups by ID for quick lookup
           const matchupMap = new Map(matchups.map((m) => [m.id, m]));

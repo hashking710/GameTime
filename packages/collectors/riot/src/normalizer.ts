@@ -29,6 +29,7 @@ export function normalizeRiotMatch(raw: RiotRawMatch): UnifiedMatch {
     streamUrl: twitchStream
       ? `https://twitch.tv/${twitchStream.parameter}`
       : undefined,
+    details: { externalEventId: raw.id },
     source: "riot",
     sourceId: raw.id,
   };

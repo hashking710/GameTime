@@ -59,6 +59,7 @@ export function normalizeSportsDbEvent(
     startTime,
     status,
     streamUrl: raw.strVideo ?? undefined,
+    details: { externalEventId: raw.idEvent },
     source: "sportsdb",
     sourceId: raw.idEvent,
   };

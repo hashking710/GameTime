@@ -64,5 +64,7 @@ export const matches = pgTable(
     index("matches_game_status_idx").on(table.game, table.status),
     index("matches_start_time_idx").on(table.startTime),
     index("matches_status_idx").on(table.status),
+    index("matches_status_start_time_idx").on(table.status, table.startTime),
+    index("matches_game_start_time_idx").on(table.game, table.startTime),
   ],
 );

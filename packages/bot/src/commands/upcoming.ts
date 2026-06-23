@@ -5,41 +5,33 @@ import {
 import { gte, and, eq, asc, inArray } from "drizzle-orm";
 import { matches, odds, users } from "@gametime/db";
 import { getOrSet, CacheKeys, CacheTTL } from "@gametime/cache";
-import { isValidGame, type OddsFormat } from "@gametime/shared";
+import { type OddsFormat } from "@gametime/shared";
 import { buildMatchEmbed, buildMatchWithOddsEmbed } from "../utils/embeds";
 import { getUserTier } from "../utils/tier";
 import { sendPaginated } from "../utils/pagination";
 import { deduplicateMatches } from "../utils/dedup";
+import { parseGameOption } from "../utils/game";
+import { withGameChoices } from "../utils/command-options";
+import { noMatchesMessage, unsupportedGameFilterMessage } from "../utils/command-messages";
+import { loadUserMatchPreferences, sortMatchesByPreferences } from "../utils/match-preferences";
 
 export default {
   data: new SlashCommandBuilder()
     .setName("upcoming")
     .setDescription("Show upcoming matches")
     .addStringOption((opt) =>
-      opt
-        .setName("game")
-        .setDescription("Filter by game")
-        .setRequired(false)
-        .addChoices(
-          { name: "CS2", value: "cs2" },
-          { name: "Valorant", value: "valorant" },
-          { name: "League of Legends", value: "lol" },
-          { name: "Dota 2", value: "dota2" },
-          { name: "NFL", value: "nfl" },
-          { name: "NBA", value: "nba" },
-          { name: "MLB", value: "mlb" },
-          { name: "NHL", value: "nhl" },
-          { name: "Soccer", value: "soccer" },
-          { name: "UFC", value: "ufc" },
-          { name: "F1", value: "f1" },
-          { name: "Tennis", value: "tennis" },
-        ),
+      withGameChoices(opt, { required: false }),
     ) as SlashCommandBuilder,
 
   async execute(interaction: ChatInputCommandInteraction) {
     await interaction.deferReply({ ephemeral: true });
     const { db, redis } = interaction.client;
-    const gameFilter = interaction.options.getString("game");
+    const rawGameFilter = interaction.options.getString("game");
+    const gameFilter = parseGameOption(rawGameFilter);
+    if (rawGameFilter && !gameFilter) {
+      await interaction.editReply(unsupportedGameFilterMessage(rawGameFilter));
+      return;
+    }
     const tier = await getUserTier(interaction);
 
     const cacheKey = gameFilter
@@ -55,7 +47,7 @@ export default {
           gte(matches.startTime, new Date()),
         ];
         if (gameFilter) {
-          conditions.push(eq(matches.game, gameFilter as typeof matches.game.enumValues[number]));
+          conditions.push(eq(matches.game, gameFilter));
         }
         return db
           .select()
@@ -68,14 +60,16 @@ export default {
     );
 
     const dedupedMatches = deduplicateMatches(upcomingMatches);
+    const preferences = await loadUserMatchPreferences(db, interaction.user.id);
+    const sortedMatches = sortMatchesByPreferences(dedupedMatches, preferences);
 
-    if (dedupedMatches.length === 0) {
-      await interaction.editReply("No upcoming matches found.");
+    if (sortedMatches.length === 0) {
+      await interaction.editReply(noMatchesMessage("upcoming"));
       return;
     }
 
     if (!tier.hasOdds) {
-      const embeds = dedupedMatches.map(buildMatchEmbed);
+      const embeds = sortedMatches.map(buildMatchEmbed);
       await sendPaginated(interaction, embeds);
       return;
     }
@@ -90,7 +84,7 @@ export default {
       oddsFormat = userRows[0].oddsFormat as OddsFormat;
     }
 
-    const matchIds = dedupedMatches.map((m) => m.id);
+    const matchIds = sortedMatches.map((m) => m.id);
     const allOdds = await db
       .select()
       .from(odds)
@@ -98,7 +92,7 @@ export default {
 
     const oddsByMatch = Map.groupBy(allOdds, (o) => o.matchId);
 
-    const embeds = dedupedMatches.map((match) =>
+    const embeds = sortedMatches.map((match) =>
       buildMatchWithOddsEmbed(match, oddsByMatch.get(match.id) ?? [], oddsFormat),
     );
 

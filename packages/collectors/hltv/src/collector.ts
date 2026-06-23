@@ -108,6 +108,7 @@ export class PandaScoreMatchCollector extends BaseCollector {
               : match.match_type,
             team1Logo: team1.image_url ?? undefined,
             team2Logo: team2.image_url ?? undefined,
+            externalEventId: match.id,
           };
 
           if (match.games && match.games.length > 0) {

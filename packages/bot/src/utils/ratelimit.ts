@@ -1,4 +1,13 @@
-const userCooldowns = new Map<string, Map<string, number>>();
+interface RateLimitRedis {
+  set(
+    key: string,
+    value: string,
+    mode: "PX",
+    durationMs: number,
+    nx: "NX",
+  ): Promise<"OK" | null>;
+  pttl(key: string): Promise<number>;
+}
 
 const COOLDOWN_MS: Record<string, number> = {
   live: 15_000,
@@ -11,36 +20,19 @@ const COOLDOWN_MS: Record<string, number> = {
   results: 5_000,
 };
 
-export function checkRateLimit(
+export async function checkRateLimit(
+  redis: RateLimitRedis,
   userId: string,
   command: string,
-): string | null {
+): Promise<string | null> {
   const cooldown = COOLDOWN_MS[command] ?? 3_000;
-  const now = Date.now();
-
-  let userMap = userCooldowns.get(userId);
-  if (!userMap) {
-    userMap = new Map();
-    userCooldowns.set(userId, userMap);
+  const key = `ratelimit:${userId}:${command}`;
+  const created = await redis.set(key, "1", "PX", cooldown, "NX");
+  if (created === "OK") {
+    return null;
   }
 
-  const lastUsed = userMap.get(command) ?? 0;
-  const remaining = cooldown - (now - lastUsed);
-
-  if (remaining > 0) {
-    return `Please wait ${Math.ceil(remaining / 1000)}s before using \`/${command}\` again.`;
-  }
-
-  userMap.set(command, now);
-  return null;
+  const ttlMs = await redis.pttl(key);
+  const remainingSeconds = ttlMs > 0 ? Math.ceil(ttlMs / 1000) : 1;
+  return `Please wait ${remainingSeconds}s before using \`/${command}\` again.`;
 }
-
-setInterval(() => {
-  const cutoff = Date.now() - 60_000;
-  for (const [userId, commands] of userCooldowns) {
-    for (const [cmd, time] of commands) {
-      if (time < cutoff) commands.delete(cmd);
-    }
-    if (commands.size === 0) userCooldowns.delete(userId);
-  }
-}, 60_000);

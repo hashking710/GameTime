@@ -27,7 +27,7 @@ export default {
             "`/track <team>` — Follow a team (max 3 free)",
             "`/untrack <team>` — Unfollow a team",
             "`/tier` — Check your plan",
-            "`/settings` — Change odds format",
+            "`/settings` — Update timezone, quiet hours, favorites, and game alerts",
           ].join("\n"),
         },
         {

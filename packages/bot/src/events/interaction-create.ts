@@ -27,7 +27,11 @@ export async function handleInteraction(interaction: Interaction) {
     return;
   }
 
-  const rateLimitMsg = checkRateLimit(interaction.user.id, interaction.commandName);
+  const rateLimitMsg = await checkRateLimit(
+    interaction.client.redis,
+    interaction.user.id,
+    interaction.commandName,
+  );
   if (rateLimitMsg) {
     await interaction.reply({ content: rateLimitMsg, ephemeral: true });
     return;

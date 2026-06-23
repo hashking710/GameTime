@@ -1,4 +1,9 @@
-import { loadEnv, createLogger, onShutdown } from "@gametime/shared";
+import {
+  loadEnv,
+  createLogger,
+  onShutdown,
+  validatePandaScoreApiKey,
+} from "@gametime/shared";
 import { getDb } from "@gametime/db";
 import { getRedis } from "@gametime/cache";
 import { OddsCollector } from "./collector";
@@ -23,6 +28,7 @@ const collector = new OddsCollector(
   env.PANDASCORE_API_KEY,
   env.ODDS_API_KEY,
 );
+await validatePandaScoreApiKey(env.PANDASCORE_API_KEY, "collector-odds");
 collector.start();
 
 logger.info("Odds collector started");

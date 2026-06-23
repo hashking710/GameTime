@@ -23,6 +23,7 @@ export function normalizeVlrMatch(raw: VlrRawMatch): UnifiedMatch {
         : startTime.getTime() < Date.now()
           ? MatchStatus.COMPLETED
           : MatchStatus.UPCOMING,
+    details: { externalEventId: raw.id },
     source: "vlr",
     sourceId: raw.id,
   };

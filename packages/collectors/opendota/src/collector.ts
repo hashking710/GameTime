@@ -82,6 +82,7 @@ export class OpenDotaCollector extends BaseCollector {
             tournament: m.league_name || "Live Match",
             startTime: new Date(),
             status: MatchStatus.LIVE,
+            details: { externalEventId: m.match_id },
             source: "opendota",
             sourceId: `live_${m.match_id}`,
           });

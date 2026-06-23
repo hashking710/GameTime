@@ -10,12 +10,15 @@ import {
 import { eq, asc } from "drizzle-orm";
 import { matches } from "@gametime/db";
 import type { Database } from "@gametime/db";
+import { createLogger } from "@gametime/shared";
 import { buildMatchEmbed } from "../utils/embeds";
 import { deduplicateMatches } from "../utils/dedup";
+import { noMatchesMessage } from "../utils/command-messages";
 
 const UPDATE_INTERVAL_MS = 30_000;
 const MAX_DURATION_MS = 2 * 60 * 60 * 1000;
 const PAGE_SIZE = 5;
+const logger = createLogger("bot:live");
 
 export default {
   data: new SlashCommandBuilder()
@@ -29,7 +32,7 @@ export default {
     let allLive = deduplicateMatches(await fetchLiveMatches(db));
 
     if (allLive.length === 0) {
-      await interaction.editReply("No matches are live right now.");
+      await interaction.editReply(noMatchesMessage("live"));
       return;
     }
 
@@ -122,7 +125,12 @@ export default {
             .setFooter({ text: "Live updates expired after 2 hours" })
             .setTimestamp();
           await interaction.editReply({ embeds: [...embeds, footer], components: [] });
-        } catch {}
+        } catch (err) {
+          logger.warn(
+            { err, phase: "expire", liveCount: allLive.length, page },
+            "Failed to send live command expiration update",
+          );
+        }
         return;
       }
 
@@ -142,7 +150,12 @@ export default {
 
         allLive = deduplicateMatches(updated);
         await interaction.editReply(buildMessage(allLive));
-      } catch {}
+      } catch (err) {
+        logger.error(
+          { err, phase: "refresh", liveCount: allLive.length, page },
+          "Live refresh cycle failed",
+        );
+      }
     }, UPDATE_INTERVAL_MS);
   },
 };

@@ -49,6 +49,7 @@ export const odds = pgTable(
       table.market,
     ),
     index("odds_match_id_idx").on(table.matchId),
+    index("odds_match_market_idx").on(table.matchId, table.market),
   ],
 );
 
@@ -76,5 +77,11 @@ export const oddsHistory = pgTable(
   (table) => [
     index("odds_history_match_id_idx").on(table.matchId),
     index("odds_history_fetched_at_idx").on(table.fetchedAt),
+    index("odds_history_match_book_market_fetched_idx").on(
+      table.matchId,
+      table.bookmaker,
+      table.market,
+      table.fetchedAt,
+    ),
   ],
 );

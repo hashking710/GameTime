@@ -35,7 +35,7 @@ for (const cmd of commands) {
   client.commands.set(cmd.data.name, cmd);
 }
 
-client.once("ready", (c) => {
+client.once("clientReady", (c) => {
   logger.info({ tag: c.user.tag }, "Bot online");
 
   if (env.KOFI_VERIFICATION_TOKEN) {

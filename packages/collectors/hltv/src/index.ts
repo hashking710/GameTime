@@ -1,4 +1,9 @@
-import { loadEnv, createLogger, onShutdown } from "@gametime/shared";
+import {
+  loadEnv,
+  createLogger,
+  onShutdown,
+  validatePandaScoreApiKey,
+} from "@gametime/shared";
 import { getDb } from "@gametime/db";
 import { getRedis } from "@gametime/cache";
 import { PandaScoreMatchCollector } from "./collector";
@@ -23,6 +28,7 @@ const collector = new PandaScoreMatchCollector(
   "*/5 * * * *",
   env.PANDASCORE_API_KEY,
 );
+await validatePandaScoreApiKey(env.PANDASCORE_API_KEY, "collector-pandascore");
 collector.start();
 
 logger.info("PandaScore esports match collector started");

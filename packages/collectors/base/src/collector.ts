@@ -1,5 +1,5 @@
 import type { UnifiedMatch } from "@gametime/shared";
-import { createLogger } from "@gametime/shared";
+import { createLogger, type Game } from "@gametime/shared";
 import type { Database } from "@gametime/db";
 import { matches, teams, teamAliases } from "@gametime/db";
 import type { RedisClient } from "@gametime/cache";
@@ -7,7 +7,7 @@ import { sql, eq, and, lte } from "drizzle-orm";
 import { invalidatePattern } from "@gametime/cache";
 import cron from "node-cron";
 
-const GAME_DURATION_HOURS: Record<string, number> = {
+const GAME_DURATION_HOURS: Partial<Record<Game, number>> = {
   nfl: 4,
   nba: 3,
   mlb: 4,
@@ -22,8 +22,16 @@ const GAME_DURATION_HOURS: Record<string, number> = {
   dota2: 5,
 };
 
+const MAX_RETRIES = 3;
+const BASE_RETRY_DELAY_MS = 500;
+const MAX_RETRY_DELAY_MS = 5_000;
+const CIRCUIT_FAILURE_THRESHOLD = 5;
+const CIRCUIT_OPEN_MS = 5 * 60_000;
+
 export abstract class BaseCollector {
   protected logger: ReturnType<typeof createLogger>;
+  private consecutiveFailures = 0;
+  private circuitOpenUntil = 0;
 
   constructor(
     protected readonly name: string,
@@ -131,7 +139,9 @@ export abstract class BaseCollector {
       )
       .returning({ id: matches.id });
 
-    for (const [game, hours] of Object.entries(GAME_DURATION_HOURS)) {
+    for (const game of Object.keys(GAME_DURATION_HOURS) as Game[]) {
+      const hours = GAME_DURATION_HOURS[game];
+      if (!hours) continue;
       const cutoff = new Date(now.getTime() - hours * 3600_000);
       await this.db
         .update(matches)
@@ -139,7 +149,7 @@ export abstract class BaseCollector {
         .where(
           and(
             eq(matches.status, "live"),
-            eq(matches.game, game as any),
+            eq(matches.game, game),
             lte(matches.startTime, cutoff),
           ),
         );
@@ -155,12 +165,33 @@ export abstract class BaseCollector {
   }
 
   async tick(): Promise<void> {
+    if (Date.now() < this.circuitOpenUntil) {
+      this.logger.warn(
+        { resumeAt: new Date(this.circuitOpenUntil).toISOString() },
+        "Collector circuit open, skipping cycle",
+      );
+      return;
+    }
+
     try {
-      const data = await this.collect();
-      await this.ingest(data);
-      await this.updateMatchLifecycle();
+      await this.runTickWithRetry();
+      this.consecutiveFailures = 0;
     } catch (err) {
-      this.logger.error({ err }, "Collection cycle failed");
+      this.consecutiveFailures++;
+      if (this.consecutiveFailures >= CIRCUIT_FAILURE_THRESHOLD) {
+        this.circuitOpenUntil = Date.now() + CIRCUIT_OPEN_MS;
+        this.consecutiveFailures = 0;
+        this.logger.error(
+          { err, openUntil: new Date(this.circuitOpenUntil).toISOString() },
+          "Collector circuit opened after repeated failures",
+        );
+        return;
+      }
+
+      this.logger.error(
+        { err, consecutiveFailures: this.consecutiveFailures },
+        "Collection cycle failed",
+      );
     }
   }
 
@@ -171,4 +202,36 @@ export abstract class BaseCollector {
       void this.tick();
     });
   }
+
+  private async runTickWithRetry(): Promise<void> {
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const data = await this.collect();
+        await this.ingest(data);
+        await this.updateMatchLifecycle();
+        return;
+      } catch (err) {
+        lastError = err;
+        if (attempt === MAX_RETRIES) break;
+        const backoff = Math.min(
+          BASE_RETRY_DELAY_MS * 2 ** (attempt - 1),
+          MAX_RETRY_DELAY_MS,
+        );
+        const jitter = Math.floor(Math.random() * 250);
+        const delay = backoff + jitter;
+        this.logger.warn(
+          { err, attempt, maxAttempts: MAX_RETRIES, retryInMs: delay },
+          "Collector cycle failed, retrying with backoff",
+        );
+        await sleep(delay);
+      }
+    }
+
+    throw lastError;
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

@@ -10,8 +10,20 @@ import { fetchPandaScoreOdds } from "./sources/pandascore";
 import { fetchTheOddsApiOdds } from "./sources/theoddsapi";
 import { fetchPinnacleOdds } from "./sources/pinnacle";
 
+const MAX_RETRIES = 3;
+const BASE_RETRY_DELAY_MS = 500;
+const MAX_RETRY_DELAY_MS = 5_000;
+const SOURCE_FAILURE_THRESHOLD = 4;
+const SOURCE_CIRCUIT_OPEN_MS = 10 * 60_000;
+
+interface SourceRuntimeState {
+  failures: number;
+  openUntil: number;
+}
+
 export class OddsCollector {
   private logger = createLogger("collector:odds");
+  private sourceStates = new Map<string, SourceRuntimeState>();
 
   constructor(
     private readonly db: Database,
@@ -145,36 +157,88 @@ export class OddsCollector {
     this.logger.info("Starting odds collector");
 
     const tickEsports = async () => {
-      try {
-        const data = await this.collectEsportsOdds();
-        await this.ingestOdds(data);
-      } catch (err) {
-        this.logger.error({ err }, "Esports odds cycle failed");
-      }
+      await this.runSourceCycle("esports", () => this.collectEsportsOdds());
     };
     void tickEsports();
     cron.schedule("*/5 * * * *", () => void tickEsports());
 
     const tickTraditional = async () => {
-      try {
-        const data = await this.collectTraditionalOdds();
-        await this.ingestOdds(data);
-      } catch (err) {
-        this.logger.error({ err }, "Traditional odds cycle failed");
-      }
+      await this.runSourceCycle("traditional", () => this.collectTraditionalOdds());
     };
     void tickTraditional();
     cron.schedule("0 */6 * * *", () => void tickTraditional());
 
     const tickSupplemental = async () => {
-      try {
-        const data = await this.collectSupplementalOdds();
-        await this.ingestOdds(data);
-      } catch (err) {
-        this.logger.error({ err }, "Supplemental odds cycle failed");
-      }
+      await this.runSourceCycle("supplemental", () => this.collectSupplementalOdds());
     };
     void tickSupplemental();
     cron.schedule("*/15 * * * *", () => void tickSupplemental());
   }
+
+  private getSourceState(source: string): SourceRuntimeState {
+    const existing = this.sourceStates.get(source);
+    if (existing) return existing;
+
+    const fresh = { failures: 0, openUntil: 0 };
+    this.sourceStates.set(source, fresh);
+    return fresh;
+  }
+
+  private async runSourceCycle(
+    source: string,
+    collect: () => Promise<UnifiedOdds[]>,
+  ): Promise<void> {
+    const state = this.getSourceState(source);
+    if (Date.now() < state.openUntil) {
+      this.logger.warn(
+        { source, resumeAt: new Date(state.openUntil).toISOString() },
+        "Odds source circuit open, skipping cycle",
+      );
+      return;
+    }
+
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const data = await collect();
+        await this.ingestOdds(data);
+        state.failures = 0;
+        return;
+      } catch (err) {
+        lastError = err;
+        if (attempt === MAX_RETRIES) break;
+        const backoff = Math.min(
+          BASE_RETRY_DELAY_MS * 2 ** (attempt - 1),
+          MAX_RETRY_DELAY_MS,
+        );
+        const jitter = Math.floor(Math.random() * 250);
+        const delay = backoff + jitter;
+        this.logger.warn(
+          { source, err, attempt, maxAttempts: MAX_RETRIES, retryInMs: delay },
+          "Odds source cycle failed, retrying with backoff",
+        );
+        await sleep(delay);
+      }
+    }
+
+    state.failures++;
+    if (state.failures >= SOURCE_FAILURE_THRESHOLD) {
+      state.openUntil = Date.now() + SOURCE_CIRCUIT_OPEN_MS;
+      state.failures = 0;
+      this.logger.error(
+        { source, err: lastError, openUntil: new Date(state.openUntil).toISOString() },
+        "Odds source circuit opened after repeated failures",
+      );
+      return;
+    }
+
+    this.logger.error(
+      { source, err: lastError, failures: state.failures },
+      "Odds source cycle failed",
+    );
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

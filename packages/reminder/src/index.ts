@@ -25,7 +25,7 @@ const sentCache = new Set<string>();
 
 setInterval(() => sentCache.clear(), 3600_000);
 
-client.once("ready", () => {
+client.once("clientReady", () => {
   logger.info("Reminder service online");
 
   // Match reminders — every minute

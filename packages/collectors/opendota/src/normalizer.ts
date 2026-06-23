@@ -24,6 +24,7 @@ export function normalizeOpenDotaMatch(raw: OpenDotaRawMatch): UnifiedMatch {
       startTime.getTime() > Date.now()
         ? MatchStatus.UPCOMING
         : MatchStatus.COMPLETED,
+    details: { externalEventId: raw.match_id },
     source: "opendota",
     sourceId: String(raw.match_id),
   };

@@ -29,6 +29,7 @@ export interface MatchDetails {
   situation?: string;
   team1Logo?: string;
   team2Logo?: string;
+  externalEventId?: string | number;
 }
 
 export interface UnifiedMatch {

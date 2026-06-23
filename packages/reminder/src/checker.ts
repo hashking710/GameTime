@@ -1,6 +1,7 @@
 import { and, eq, gte, lte, or, sql } from "drizzle-orm";
-import { matches, userSubscriptions, teams } from "@gametime/db";
+import { matches, userSubscriptions, teams, users } from "@gametime/db";
 import type { Database } from "@gametime/db";
+import { isGameMuted, isQuietHoursActive } from "./preferences";
 
 export interface PendingNotification {
   discordId: string;
@@ -34,6 +35,10 @@ export async function findPendingNotifications(
       notify15min: userSubscriptions.notify15min,
       notify5min: userSubscriptions.notify5min,
       notifyLive: userSubscriptions.notifyLive,
+      timezone: users.timezone,
+      quietHoursStart: users.quietHoursStart,
+      quietHoursEnd: users.quietHoursEnd,
+      mutedGames: users.mutedGames,
     })
     .from(matches)
     .innerJoin(
@@ -46,6 +51,7 @@ export async function findPendingNotifications(
       ) AND ${teams.game} = ${matches.game}`,
     )
     .innerJoin(userSubscriptions, eq(userSubscriptions.teamId, teams.id))
+    .innerJoin(users, eq(userSubscriptions.discordId, users.discordId))
     .where(
       and(
         or(eq(matches.status, "upcoming"), eq(matches.status, "live")),
@@ -66,6 +72,10 @@ export async function findPendingNotifications(
       if (minutesUntil > 17 && minutesUntil <= 35 && !r.notify30min) return null;
       if (minutesUntil > 35 && minutesUntil <= 65 && !r.notify60min) return null;
       if (minutesUntil > 65) return null;
+      if (isGameMuted(r.game, r.mutedGames)) return null;
+      if (isQuietHoursActive(r.timezone, r.quietHoursStart, r.quietHoursEnd, now)) {
+        return null;
+      }
 
       return {
         discordId: r.discordId,

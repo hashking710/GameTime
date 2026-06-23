@@ -7,43 +7,38 @@ import { matches } from "@gametime/db";
 import { buildMatchEmbed } from "../utils/embeds";
 import { sendPaginated } from "../utils/pagination";
 import { deduplicateMatches } from "../utils/dedup";
+import { parseGameOption } from "../utils/game";
+import { withGameChoices } from "../utils/command-options";
+import { noMatchesMessage, unsupportedGameFilterMessage } from "../utils/command-messages";
 
 export default {
   data: new SlashCommandBuilder()
     .setName("schedule")
     .setDescription("Show full schedule for a game")
     .addStringOption((opt) =>
-      opt
-        .setName("game")
-        .setDescription("Game to filter (e.g. cs2, nba, lol)")
-        .setRequired(true)
-        .addChoices(
-          { name: "CS2", value: "cs2" },
-          { name: "Valorant", value: "valorant" },
-          { name: "League of Legends", value: "lol" },
-          { name: "Dota 2", value: "dota2" },
-          { name: "NFL", value: "nfl" },
-          { name: "NBA", value: "nba" },
-          { name: "MLB", value: "mlb" },
-          { name: "NHL", value: "nhl" },
-          { name: "Soccer", value: "soccer" },
-          { name: "UFC", value: "ufc" },
-          { name: "F1", value: "f1" },
-          { name: "Tennis", value: "tennis" },
-        ),
+      withGameChoices(opt, {
+        name: "game",
+        description: "Game to filter (e.g. cs2, nba, lol)",
+        required: true,
+      }),
     ) as SlashCommandBuilder,
 
   async execute(interaction: ChatInputCommandInteraction) {
     await interaction.deferReply({ ephemeral: true });
     const { db } = interaction.client;
-    const game = interaction.options.getString("game", true);
+    const rawGame = interaction.options.getString("game", true);
+    const game = parseGameOption(rawGame);
+    if (!game) {
+      await interaction.editReply(unsupportedGameFilterMessage(rawGame));
+      return;
+    }
 
     const upcoming = await db
       .select()
       .from(matches)
       .where(
         and(
-          eq(matches.game, game as any),
+          eq(matches.game, game),
           gte(matches.startTime, new Date()),
         ),
       )
@@ -53,9 +48,7 @@ export default {
     const dedupedMatches = deduplicateMatches(upcoming);
 
     if (dedupedMatches.length === 0) {
-      await interaction.editReply(
-        `No upcoming ${game.toUpperCase()} matches found.`,
-      );
+      await interaction.editReply(noMatchesMessage("schedule", game));
       return;
     }
 

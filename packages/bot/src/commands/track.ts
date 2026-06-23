@@ -6,6 +6,7 @@ import {
 import { eq, sql, and } from "drizzle-orm";
 import { users, teams, userSubscriptions } from "@gametime/db";
 import { getUserTier } from "../utils/tier";
+import { collectMissingSubscriptionTeamIds } from "../utils/subscriptions";
 
 export default {
   data: new SlashCommandBuilder()
@@ -92,15 +93,15 @@ export default {
         sql`(${teams.canonicalName} = ${canonical} OR ${teams.name} = ${canonical})`,
       );
 
-    const existingTeamIds = new Set(existingSubs.map((s) => s.teamId));
-    let added = 0;
-    for (const variant of allVariants) {
-      if (existingTeamIds.has(variant.id)) continue;
+    const teamIdsToAdd = collectMissingSubscriptionTeamIds(
+      allVariants.map((variant) => variant.id),
+      existingSubs.map((s) => s.teamId),
+    );
+    for (const teamId of teamIdsToAdd) {
       await db
         .insert(userSubscriptions)
-        .values({ discordId, teamId: variant.id })
+        .values({ discordId, teamId })
         .onConflictDoNothing();
-      added++;
     }
 
     await interaction.editReply(

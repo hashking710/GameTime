@@ -3,6 +3,7 @@ import { matches, odds, oddsHistory, users, userSubscriptions, teams } from "@ga
 import type { Database } from "@gametime/db";
 import type { Client } from "discord.js";
 import { createLogger, GAME_EMOJI } from "@gametime/shared";
+import { isGameMuted, isQuietHoursActive } from "./preferences";
 
 const logger = createLogger("alerts");
 
@@ -43,7 +44,13 @@ export async function checkUpsetAlerts(
     const underdogOdds = t1Score > t2Score ? o.team1Odds : o.team2Odds;
 
     const premiumSubs = await db
-      .select({ discordId: userSubscriptions.discordId })
+      .select({
+        discordId: userSubscriptions.discordId,
+        timezone: users.timezone,
+        quietHoursStart: users.quietHoursStart,
+        quietHoursEnd: users.quietHoursEnd,
+        mutedGames: users.mutedGames,
+      })
       .from(userSubscriptions)
       .innerJoin(teams, eq(userSubscriptions.teamId, teams.id))
       .innerJoin(users, eq(userSubscriptions.discordId, users.discordId))
@@ -57,7 +64,12 @@ export async function checkUpsetAlerts(
 
     const emoji = GAME_EMOJI[match.game] ?? ":trophy:";
 
-    for (const { discordId } of premiumSubs) {
+    for (const userPrefs of premiumSubs) {
+      const { discordId } = userPrefs;
+      if (isGameMuted(match.game, userPrefs.mutedGames)) continue;
+      if (isQuietHoursActive(userPrefs.timezone, userPrefs.quietHoursStart, userPrefs.quietHoursEnd)) {
+        continue;
+      }
       const key = `upset:${discordId}:${match.id}`;
       if (sentCache.has(key)) continue;
       sentCache.add(key);
@@ -130,7 +142,13 @@ export async function checkLineMovementAlerts(
     const direction = newOdds > oldOdds ? "lengthened" : "shortened";
 
     const premiumSubs = await db
-      .select({ discordId: userSubscriptions.discordId })
+      .select({
+        discordId: userSubscriptions.discordId,
+        timezone: users.timezone,
+        quietHoursStart: users.quietHoursStart,
+        quietHoursEnd: users.quietHoursEnd,
+        mutedGames: users.mutedGames,
+      })
       .from(userSubscriptions)
       .innerJoin(teams, eq(userSubscriptions.teamId, teams.id))
       .innerJoin(users, eq(userSubscriptions.discordId, users.discordId))
@@ -144,7 +162,12 @@ export async function checkLineMovementAlerts(
 
     const emoji = GAME_EMOJI[row.matches.game] ?? ":trophy:";
 
-    for (const { discordId } of premiumSubs) {
+    for (const userPrefs of premiumSubs) {
+      const { discordId } = userPrefs;
+      if (isGameMuted(row.matches.game, userPrefs.mutedGames)) continue;
+      if (isQuietHoursActive(userPrefs.timezone, userPrefs.quietHoursStart, userPrefs.quietHoursEnd)) {
+        continue;
+      }
       const key = `line:${discordId}:${row.odds.matchId}:${row.odds.bookmaker}`;
       if (sentCache.has(key)) continue;
       sentCache.add(key);
