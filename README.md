@@ -23,15 +23,16 @@ GameTime tracks matches across **16 games**, aggregates odds from **9+ bookmaker
 - **Live scores** — Auto-updating embeds with map/period breakdowns, refreshing every 30 seconds
 - **Match schedules + results** — Today's games, upcoming matches, full schedules, and recent results
 - **Team tracking** — Follow teams across games and get DM notifications before their matches
+- **Score & win alerts** — DM'd when a map is won (esports), a period ends (traditional sports), or a match concludes — Premium
 - **Betting odds** — Moneyline, spreads, and totals from FanDuel, DraftKings, BetOnline, and more
 - **Odds format toggle** — Switch between American (-110) and Decimal (1.91)
 - **Team logos** — Esports team logos displayed in embeds
-- **Upset alerts** — Get notified when a heavy underdog is winning live
-- **Line movement alerts** — Know when odds shift significantly
-- **Daily digest** — Morning DM with your tracked teams' schedule
-- **Notification controls** — Quiet hours, muted games, and reminder preferences
+- **Upset alerts** — Get notified when a heavy underdog is winning live — Premium
+- **Line movement alerts** — Know when odds shift significantly — Premium
+- **Daily digest** — Morning DM with your tracked teams' schedule — Premium
+- **Notification controls** — Quiet hours, muted games, score alert toggle, and reminder preferences
 - **Personalized sorting** — `/today` and `/upcoming` prioritize tracked teams and favorites
-- **Freemium model** — Free tier with 3 teams + basic reminders, Premium ($4.99/mo) for odds, unlimited tracking, and alerts
+- **Freemium model** — Free tier with 3 teams + basic reminders, Premium ($4.99/mo) for odds, unlimited tracking, and all alerts
 
 ### Bot Commands
 
@@ -45,7 +46,7 @@ GameTime tracks matches across **16 games**, aggregates odds from **9+ bookmaker
 | `/track` | Follow a team (autocomplete search) | Free (3) / Premium (∞) |
 | `/untrack` | Stop following a team | Free |
 | `/odds` | Odds from multiple bookmakers | Premium |
-| `/settings` | Odds format, timezone, quiet hours, muted games, favorites | Free |
+| `/settings` | Odds format, timezone, quiet hours, muted games, score alerts toggle, favorites | Free |
 | `/subscribe` | Premium info + Ko-fi link | Free |
 | `/tier` | Check your current plan | Free |
 | `/help` | Full feature overview | Free |
@@ -140,7 +141,7 @@ packages/
     opendota/      — Dota 2 pro matches (OpenDota API)
     sportsdb/      — Traditional sports schedules + ESPN live scores
     odds/          — Odds from PandaScore, TheOddsAPI, Pinnacle
-  reminder/        — Match reminders, upset alerts, line movement alerts, daily digest
+  reminder/        — Match reminders, score/win alerts, upset alerts, line movement alerts, daily digest
 ```
 
 ## Tech Stack

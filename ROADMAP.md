@@ -11,7 +11,8 @@ GameTime is a Discord bot tracking 16 games across esports and traditional sport
 - Odds from 9+ bookmakers with American/decimal toggle
 - Freemium tier ($4.99/mo via Ko-fi) with team tracking limits, odds gating, and premium alerts
 - Daily digest, upset alerts, line movement alerts
-- Team alias deduplication, timezone-aware notifications, quiet hours
+- Score & win alerts — per-map (esports) and per-period (traditional sports) DMs, plus match-end results (Premium/admin)
+- Team alias deduplication, timezone-aware notifications, quiet hours, score alert toggle
 - Full Docker Compose deployment
 
 ---
