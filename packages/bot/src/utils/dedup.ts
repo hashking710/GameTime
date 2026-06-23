@@ -1,16 +1,22 @@
 import type { InferSelectModel } from "drizzle-orm";
 import type { matches } from "@gametime/db";
 import { normalizeTeamName } from "./team-name";
+import { isEsport } from "@gametime/shared";
 
 type Match = InferSelectModel<typeof matches>;
 
-const SOURCE_PRIORITY: Record<string, number> = {
-  pandascore: 10,
-  espn: 9,
-  opendota: 8,
+const ESPORTS_SOURCE_PRIORITY: Record<string, number> = {
+  vlr: 10,
+  opendota: 10,
+  pandascore: 7,
+  theoddsapi: 3,
+};
+
+const SPORTS_SOURCE_PRIORITY: Record<string, number> = {
+  espn: 10,
   sportsdb: 7,
-  theoddsapi: 6,
-  vlr: 5,
+  theoddsapi: 5,
+  pandascore: 3,
 };
 
 export function deduplicateMatches(all: Match[]): Match[] {
@@ -25,51 +31,66 @@ export function deduplicateMatches(all: Match[]): Match[] {
       continue;
     }
 
-    const existingPriority = SOURCE_PRIORITY[existing.source] ?? 0;
-    const newPriority = SOURCE_PRIORITY[match.source] ?? 0;
-
-    const existingHasDetails = existing.details != null;
-    const newHasDetails = match.details != null;
-    const existingHasScore = (existing.team1Score ?? 0) + (existing.team2Score ?? 0) > 0;
-    const newHasScore = (match.team1Score ?? 0) + (match.team2Score ?? 0) > 0;
-    
-    // Check for image/logo data in both matches
-    const existingHasImages = hasImages(existing);
-    const newHasImages = hasImages(match);
-
-    // Prefer match with images (especially for esports like Valorant)
-    if (newHasImages && !existingHasImages) {
-      groups.set(key, match);
-      continue;
-    }
-
-    // If both have or both lack images, use other criteria
-    if (
-      (newHasDetails && !existingHasDetails) ||
-      (newHasScore && !existingHasScore) ||
-      (!existingHasDetails && !existingHasScore && newPriority > existingPriority)
-    ) {
-      groups.set(key, match);
+    const winner = pickBetter(existing, match);
+    if (winner !== existing) {
+      // Carry logos from the loser if winner lacks them
+      if (!hasImages(winner) && hasImages(existing)) {
+        const winnerDetails = (winner.details ?? {}) as Record<string, unknown>;
+        const existingDetails = (existing.details ?? {}) as Record<string, unknown>;
+        winnerDetails.team1Logo = winnerDetails.team1Logo ?? existingDetails.team1Logo;
+        winnerDetails.team2Logo = winnerDetails.team2Logo ?? existingDetails.team2Logo;
+        (winner as any).details = winnerDetails;
+      }
+      groups.set(key, winner);
+    } else if (!hasImages(existing) && hasImages(match)) {
+      // Even if existing wins, grab logos from the new match
+      const existingDetails = (existing.details ?? {}) as Record<string, unknown>;
+      const matchDetails = (match.details ?? {}) as Record<string, unknown>;
+      existingDetails.team1Logo = existingDetails.team1Logo ?? matchDetails.team1Logo;
+      existingDetails.team2Logo = existingDetails.team2Logo ?? matchDetails.team2Logo;
+      (existing as any).details = existingDetails;
     }
   }
 
   return Array.from(groups.values());
 }
 
+function pickBetter(a: Match, b: Match): Match {
+  const esport = isEsport(a.game as any);
+  const priorities = esport ? ESPORTS_SOURCE_PRIORITY : SPORTS_SOURCE_PRIORITY;
+
+  const aHasScore = (a.team1Score ?? 0) + (a.team2Score ?? 0) > 0;
+  const bHasScore = (b.team1Score ?? 0) + (b.team2Score ?? 0) > 0;
+  if (bHasScore && !aHasScore) return b;
+  if (aHasScore && !bHasScore) return a;
+
+  const aHasGameDetails = hasGameDetails(a);
+  const bHasGameDetails = hasGameDetails(b);
+  if (bHasGameDetails && !aHasGameDetails) return b;
+  if (aHasGameDetails && !bHasGameDetails) return a;
+
+  const aPriority = priorities[a.source] ?? 0;
+  const bPriority = priorities[b.source] ?? 0;
+  if (bPriority > aPriority) return b;
+
+  return a;
+}
+
+function hasGameDetails(match: Match): boolean {
+  if (!match.details) return false;
+  const d = match.details as Record<string, unknown>;
+  const games = d.games as unknown[];
+  const periods = d.periods as unknown[];
+  return (games?.length ?? 0) > 0 || (periods?.length ?? 0) > 0 || d.clock != null;
+}
+
 function hasImages(match: Match): boolean {
-  // Check for team logos in details
-  if (match.details) {
-    const details = match.details as Record<string, unknown>;
-    if (details.team1Logo || details.team2Logo) {
-      return true;
-    }
-  }
-  return false;
+  if (!match.details) return false;
+  const details = match.details as Record<string, unknown>;
+  return Boolean(details.team1Logo || details.team2Logo);
 }
 
 function getDedupKey(match: Match): string {
-  // Use date-based bucketing so same teams on same calendar day are deduplicated,
-  // regardless of exact time or source reporting delay
   const startMs = new Date(match.startTime).getTime();
   const date = Number.isFinite(startMs)
     ? new Date(startMs).toISOString().split("T")[0]
