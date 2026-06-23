@@ -117,7 +117,11 @@ export async function updateLiveScores(db: Database, redis: RedisClient): Promis
           }));
         }
 
-        // Match by team names + game type (fuzzy: home team name contains)
+        // Match by team names + game type + date window (today ± 12 hours)
+        const eventDate = new Date(event.date ?? event.competitions[0]?.date ?? Date.now());
+        const dateWindowStart = new Date(eventDate.getTime() - 12 * 3600_000);
+        const dateWindowEnd = new Date(eventDate.getTime() + 12 * 3600_000);
+
         const updated = await db
           .update(matches)
           .set({
@@ -130,6 +134,8 @@ export async function updateLiveScores(db: Database, redis: RedisClient): Promis
           .where(
             and(
               eq(matches.game, game),
+              sql`${matches.startTime} >= ${dateWindowStart}`,
+              sql`${matches.startTime} <= ${dateWindowEnd}`,
               sql`(
                 ${matches.team1} ILIKE '%' || ${home.team.shortDisplayName} || '%'
                 OR ${matches.team1} ILIKE '%' || ${home.team.displayName} || '%'
@@ -158,6 +164,8 @@ export async function updateLiveScores(db: Database, redis: RedisClient): Promis
             .where(
               and(
                 eq(matches.game, game),
+                sql`${matches.startTime} >= ${dateWindowStart}`,
+                sql`${matches.startTime} <= ${dateWindowEnd}`,
                 sql`(
                   ${matches.team1} ILIKE '%' || ${away.team.shortDisplayName} || '%'
                   OR ${matches.team1} ILIKE '%' || ${away.team.displayName} || '%'
