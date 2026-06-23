@@ -1,20 +1,7 @@
-import { type Game, type UnifiedOdds, OddsMarket } from "@gametime/shared";
+import { type UnifiedOdds, OddsMarket, PANDASCORE_GAME_MAP } from "@gametime/shared";
 import { createLogger } from "@gametime/shared";
 
 const logger = createLogger("odds:pandascore");
-
-const PANDASCORE_GAME_MAP: Record<string, Game> = {
-  csgo: "cs2",
-  "cs-go": "cs2",
-  valorant: "valorant",
-  lol: "lol",
-  "league-of-legends": "lol",
-  dota2: "dota2",
-  "dota-2": "dota2",
-  rl: "rocket_league",
-  r6siege: "rainbow_six",
-  codmw: "cod",
-};
 
 interface PandaScoreMatch {
   id: number;
@@ -32,10 +19,6 @@ interface PandaScoreOdds {
     name: string;
     odds: { selection: string; value: number }[];
   }[];
-}
-
-export function pandascoreGameMap(): Record<string, Game> {
-  return PANDASCORE_GAME_MAP;
 }
 
 export async function fetchPandaScoreOdds(

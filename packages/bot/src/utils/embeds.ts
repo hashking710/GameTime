@@ -1,29 +1,10 @@
 import { EmbedBuilder } from "discord.js";
 import type { InferSelectModel } from "drizzle-orm";
 import type { matches, odds } from "@gametime/db";
-import { formatOdds, type OddsFormat, type MatchDetails, type MatchSubGame, type MatchPeriod } from "@gametime/shared";
+import { formatOdds, GAME_EMOJI, type OddsFormat, type MatchDetails, type MatchSubGame, type MatchPeriod } from "@gametime/shared";
 
 type Match = InferSelectModel<typeof matches>;
 type Odds = InferSelectModel<typeof odds>;
-
-const GAME_EMOJI: Record<string, string> = {
-  cs2: ":gun:",
-  valorant: ":dart:",
-  lol: ":video_game:",
-  dota2: ":crossed_swords:",
-  rocket_league: ":racing_car:",
-  apex: ":boom:",
-  rainbow_six: ":shield:",
-  cod: ":military_helmet:",
-  nfl: ":football:",
-  nba: ":basketball:",
-  mlb: ":baseball:",
-  nhl: ":ice_cube:",
-  soccer: ":soccer:",
-  ufc: ":boxing_glove:",
-  f1: ":checkered_flag:",
-  tennis: ":tennis:",
-};
 
 const STATUS_COLOR = {
   upcoming: 0x3498db,

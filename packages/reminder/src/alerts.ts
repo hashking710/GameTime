@@ -2,22 +2,9 @@ import { and, eq, gte, sql, lte } from "drizzle-orm";
 import { matches, odds, oddsHistory, users, userSubscriptions, teams } from "@gametime/db";
 import type { Database } from "@gametime/db";
 import type { Client } from "discord.js";
-import { createLogger } from "@gametime/shared";
+import { createLogger, GAME_EMOJI } from "@gametime/shared";
 
 const logger = createLogger("alerts");
-
-const GAME_EMOJI: Record<string, string> = {
-  cs2: ":gun:",
-  valorant: ":dart:",
-  lol: ":video_game:",
-  dota2: ":crossed_swords:",
-  nfl: ":football:",
-  nba: ":basketball:",
-  mlb: ":baseball:",
-  nhl: ":ice_cube:",
-  soccer: ":soccer:",
-  ufc: ":boxing_glove:",
-};
 
 export async function checkUpsetAlerts(
   db: Database,

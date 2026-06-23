@@ -9,6 +9,7 @@ import {
 } from "discord.js";
 import { eq, asc } from "drizzle-orm";
 import { matches } from "@gametime/db";
+import type { Database } from "@gametime/db";
 import { buildMatchEmbed } from "../utils/embeds";
 
 const UPDATE_INTERVAL_MS = 30_000;
@@ -145,7 +146,7 @@ export default {
   },
 };
 
-async function fetchLiveMatches(db: any) {
+async function fetchLiveMatches(db: Database) {
   return db
     .select()
     .from(matches)

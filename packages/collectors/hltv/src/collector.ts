@@ -1,24 +1,11 @@
 import { BaseCollector } from "@gametime/collector-base";
 import {
   MatchStatus,
+  PANDASCORE_GAME_MAP,
   type UnifiedMatch,
-  type Game,
   type MatchDetails,
   type MatchSubGame,
 } from "@gametime/shared";
-
-const PANDASCORE_GAME_MAP: Record<string, Game> = {
-  "cs-go": "cs2",
-  csgo: "cs2",
-  valorant: "valorant",
-  lol: "lol",
-  "league-of-legends": "lol",
-  "dota-2": "dota2",
-  dota2: "dota2",
-  rl: "rocket_league",
-  r6siege: "rainbow_six",
-  codmw: "cod",
-};
 
 const PANDASCORE_STATUS_MAP: Record<string, MatchStatus> = {
   not_started: MatchStatus.UPCOMING,
