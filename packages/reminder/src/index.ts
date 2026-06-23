@@ -55,8 +55,8 @@ client.once("ready", () => {
     }
   });
 
-  // Daily digest — 8 AM UTC every day
-  cron.schedule("0 8 * * *", async () => {
+  // Daily digest — check every hour, send to users whose local time is 8 AM
+  cron.schedule("0 * * * *", async () => {
     try {
       await sendDailyDigests(db, client);
     } catch (err) {
