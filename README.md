@@ -82,7 +82,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full multi-stack deployment desig
 
 ```bash
 # Clone
-git clone https://github.com/YOUR_USERNAME/GameTime.git
+git clone https://github.com/hashking710/GameTime.git
 cd GameTime
 
 # Configure
