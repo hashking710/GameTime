@@ -21,7 +21,7 @@ GameTime tracks matches across **16 games**, aggregates odds from **9+ bookmaker
 ### Features
 
 - **Live scores** — Auto-updating embeds with map/period breakdowns, refreshing every 30 seconds
-- **Match schedules** — Today's games, upcoming matches, full schedules filtered by game
+- **Match schedules + results** — Today's games, upcoming matches, full schedules, and recent results
 - **Team tracking** — Follow teams across games and get DM notifications before their matches
 - **Betting odds** — Moneyline, spreads, and totals from FanDuel, DraftKings, BetOnline, and more
 - **Odds format toggle** — Switch between American (-110) and Decimal (1.91)
@@ -29,6 +29,8 @@ GameTime tracks matches across **16 games**, aggregates odds from **9+ bookmaker
 - **Upset alerts** — Get notified when a heavy underdog is winning live
 - **Line movement alerts** — Know when odds shift significantly
 - **Daily digest** — Morning DM with your tracked teams' schedule
+- **Notification controls** — Quiet hours, muted games, and reminder preferences
+- **Personalized sorting** — `/today` and `/upcoming` prioritize tracked teams and favorites
 - **Freemium model** — Free tier with 3 teams + basic reminders, Premium ($4.99/mo) for odds, unlimited tracking, and alerts
 
 ### Bot Commands
@@ -39,10 +41,11 @@ GameTime tracks matches across **16 games**, aggregates odds from **9+ bookmaker
 | `/upcoming` | Upcoming matches with game filter dropdown | Free |
 | `/live` | Live matches with auto-updating scores + pagination | Free |
 | `/schedule` | Full schedule for a specific game | Free |
+| `/results` | Recent completed matches | Free |
 | `/track` | Follow a team (autocomplete search) | Free (3) / Premium (∞) |
 | `/untrack` | Stop following a team | Free |
 | `/odds` | Odds from multiple bookmakers | Premium |
-| `/settings` | Toggle odds format (decimal/american) | Free |
+| `/settings` | Odds format, timezone, quiet hours, muted games, favorites | Free |
 | `/subscribe` | Premium info + Ko-fi link | Free |
 | `/tier` | Check your current plan | Free |
 | `/help` | Full feature overview | Free |
@@ -121,7 +124,7 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-This starts **8 containers**: PostgreSQL, Redis, migrations, Discord bot, PandaScore collector, OpenDota collector, SportsDB + ESPN collector, odds collector, and the reminder service.
+This starts **9 containers**: PostgreSQL, Redis, migrations, Discord bot, PandaScore collector, OpenDota collector, SportsDB + ESPN collector, odds collector, and the reminder service.
 
 ## Project Structure
 
@@ -130,7 +133,7 @@ packages/
   shared/          — Types, logger, env loader, validation schemas, constants
   db/              — Drizzle ORM schema, migrations, client
   cache/           — Redis client, cache keys, getOrSet helper
-  bot/             — Discord.js bot, 11 slash commands, Ko-fi webhook
+  bot/             — Discord.js bot, 12 slash commands, Ko-fi webhook
   collectors/
     base/          — Abstract BaseCollector (ingest, team upsert, lifecycle)
     hltv/          — PandaScore esports collector (CS2, Val, LoL, Dota 2)
