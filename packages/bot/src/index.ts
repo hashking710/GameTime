@@ -1,6 +1,6 @@
 import { Client, GatewayIntentBits, Collection } from "discord.js";
 import { createLogger, loadEnv, onShutdown } from "@gametime/shared";
-import { getDb } from "@gametime/db";
+import { getDb, runMigrations } from "@gametime/db";
 import { getRedis } from "@gametime/cache";
 import { z } from "zod";
 import { loadCommands } from "./commands/index";
@@ -24,6 +24,8 @@ const logger = createLogger("bot");
 const client = new Client({
   intents: [GatewayIntentBits.Guilds],
 });
+
+await runMigrations();
 
 const db = getDb(env.DATABASE_URL);
 client.db = db;

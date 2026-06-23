@@ -1,14 +1,22 @@
 import { migrate } from "drizzle-orm/node-postgres/migrator";
+import { fileURLToPath, pathToFileURL } from "url";
 import { getDb } from "./client";
 
-async function main() {
+export async function runMigrations() {
   const db = getDb();
-  await migrate(db, { migrationsFolder: "./drizzle" });
+  const migrationsFolder = fileURLToPath(new URL("../drizzle", import.meta.url));
+  await migrate(db, { migrationsFolder });
+}
+
+async function main() {
+  await runMigrations();
   console.log("Migrations complete");
   process.exit(0);
 }
 
-main().catch((e) => {
-  console.error("Migration failed:", e);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((e) => {
+    console.error("Migration failed:", e);
+    process.exit(1);
+  });
+}

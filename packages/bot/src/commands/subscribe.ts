@@ -4,6 +4,7 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  MessageFlags,
   type ChatInputCommandInteraction,
 } from "discord.js";
 import { eq } from "drizzle-orm";
@@ -17,7 +18,7 @@ export default {
     .setDescription("Get GameTime Premium for odds, unlimited tracking, and more") as SlashCommandBuilder,
 
   async execute(interaction: ChatInputCommandInteraction) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const { db } = interaction.client;
     const discordId = interaction.user.id;
 

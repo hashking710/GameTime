@@ -1,5 +1,6 @@
 import {
   SlashCommandBuilder,
+  MessageFlags,
   type ChatInputCommandInteraction,
 } from "discord.js";
 import { eq, and, desc } from "drizzle-orm";
@@ -20,7 +21,7 @@ export default {
     ) as SlashCommandBuilder,
 
   async execute(interaction: ChatInputCommandInteraction) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const { db } = interaction.client;
     const rawGameFilter = interaction.options.getString("game");
     const gameFilter = parseGameOption(rawGameFilter);

@@ -1,5 +1,6 @@
 import {
   SlashCommandBuilder,
+  MessageFlags,
   type ChatInputCommandInteraction,
 } from "discord.js";
 import { eq, and, gte, asc, inArray } from "drizzle-orm";
@@ -20,7 +21,7 @@ export default {
     ) as SlashCommandBuilder,
 
   async execute(interaction: ChatInputCommandInteraction) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     if (!(await requirePremium(interaction))) return;
 

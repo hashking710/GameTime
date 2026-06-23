@@ -1,6 +1,7 @@
 import {
   SlashCommandBuilder,
   EmbedBuilder,
+  MessageFlags,
   type ChatInputCommandInteraction,
 } from "discord.js";
 import { eq } from "drizzle-orm";
@@ -12,7 +13,7 @@ export default {
     .setDescription("Check your current plan and feature access") as SlashCommandBuilder,
 
   async execute(interaction: ChatInputCommandInteraction) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const { db } = interaction.client;
     const discordId = interaction.user.id;
 

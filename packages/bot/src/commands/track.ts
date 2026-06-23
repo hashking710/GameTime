@@ -1,5 +1,6 @@
 import {
   SlashCommandBuilder,
+  MessageFlags,
   type ChatInputCommandInteraction,
   type AutocompleteInteraction,
 } from "discord.js";
@@ -45,7 +46,7 @@ export default {
   },
 
   async execute(interaction: ChatInputCommandInteraction) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const { db } = interaction.client;
     const teamId = interaction.options.getString("team", true);
     const discordId = interaction.user.id;

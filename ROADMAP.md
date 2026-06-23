@@ -16,63 +16,58 @@ GameTime is a Discord bot tracking 16 games across esports and traditional sport
 
 ---
 
-## Phase 2: Web Dashboard (Q3 2026)
+## Phase 2: Web Foundation (Q4 2026 - Q1 2027)
 
-A companion web portal where users can manage their GameTime experience outside of Discord.
+Build a separate GameTime-owned web experience on its own domain. Keep the first release focused on the lowest-risk, highest-value account workflows.
 
 ### User-Facing Features
 - **Match Hub** — Live scores, upcoming schedules, and results in a clean web UI. Filterable by game, date, and league.
-- **Odds Dashboard** — Side-by-side bookmaker comparison, best available lines, historical line charts.
 - **My Teams** — Visual team management. Track/untrack teams, see upcoming matches for followed teams, notification history.
-- **Account Settings** — Timezone, odds format, quiet hours, muted games, favorite teams/leagues. Changes sync to Discord bot instantly.
-- **Subscription Management** — Purchase, manage, and cancel Premium. Payment receipts and billing history.
+- **Account Settings** — Timezone, odds format, quiet hours, muted games, favorite teams/leagues. Changes sync to Discord when possible.
+- **Subscription Status** — Premium visibility, payment links, and handoff to the payment provider for anything beyond status display.
 
 ### Integration Layer
 - REST API service reading from the shared PostgreSQL database
-- HKR handles payment processing and subscription lifecycle
+- Separate GameTime domain or subdomain, independent from the HKR website
+- HKR stays unrelated except as a portfolio/payment portal if needed
 - Discord account linking via OAuth2 (user connects their Discord to their web account)
-- Unified user profile — settings changed on web reflect in Discord and vice versa
+- Unified profile where practical, but Discord remains the primary surface
 
 ### Technical Implementation
-- REST API: `/api/matches`, `/api/odds`, `/api/teams`, `/api/user`, `/api/subscribe`
-- Payment webhook endpoint for subscription events
+- REST API: `/api/matches`, `/api/teams`, `/api/user`, `/api/subscribe`
+- Payment webhook endpoint for subscription events, if and when a dedicated billing flow exists
 - Session management with Discord OAuth2 tokens
-- Runs as a separate Docker stack on the shared `gametime` network
+- Runs as a separate Docker stack with its own domain routing
 
 ---
 
-## Phase 3: Enhanced Bot Features (Q4 2026)
+## Phase 3: Bot + Web Expansion (Q3 2027)
 
-### Tournament Tracking
+### Bot Enhancements
 - `/tournament` command — Follow entire tournaments (IEM Cologne, Worlds, Super Bowl playoffs)
 - Tournament bracket visualization in embeds
 - Auto-track all matches in a followed tournament
 - Tournament results and standings
 
-### Roster & Player Data
-- Player profiles with stats (K/D for CS2, KDA for LoL, passing yards for NFL)
-- Roster change notifications ("Player X transferred from Team A to Team B")
-- Head-to-head team history ("Team Liquid vs Cloud9: 12-8 all time")
+### Web Expansion
+- Odds dashboard with side-by-side bookmaker comparison
+- Historical line charts and best-available line summaries
+- Roster and player profiles for a few high-value games first
+- Per-server settings and role-based notifications
 
 ### Match Predictions
 - Community predictions — users vote on match outcomes before they start
 - Prediction accuracy leaderboard per server
 - Optional integration with odds to show implied probabilities
 
-### Server Configuration
-- Per-server settings (server owners configure defaults)
-- Dedicated match feed channel — bot auto-posts matches for server-followed teams
-- Role-based notifications (e.g., @CS2 role gets pinged for CS2 matches)
-- Configurable public vs ephemeral responses per channel
-
 ---
 
-## Phase 4: Social & Community (Q1 2027)
+## Phase 4: Social & Community (Q1 2028)
 
 ### Watch Parties
 - `/watchparty` command — Create a watch party for an upcoming match
 - RSVP system with reminders
-- Voice channel integration — auto-create/name a VC for the match
+- Voice channel integration — auto-create or name a VC for the match
 
 ### Fantasy Integration
 - Weekly fantasy picks for followed games
@@ -83,16 +78,16 @@ A companion web portal where users can manage their GameTime experience outside 
 ### Personalized Feed
 - Smart match recommendations based on tracking history and viewing patterns
 - "Matches you might like" suggestions
-- Trending matches (most tracked/discussed across all GameTime users)
+- Trending matches across all GameTime users
 
 ---
 
-## Phase 5: Platform Expansion (Q2 2027)
+## Phase 5: Platform Expansion (2028+)
 
 ### Mobile App
-- React Native app with push notifications
-- Same backend — reads from the shared PostgreSQL
-- Real-time score updates without Discord
+- Mobile app is a later-stage possibility, not a core near-term commitment
+- If pursued, it should start with a read-only companion app before attempting full account management or push notifications
+- Reuse the shared backend and APIs only after the web foundation is stable
 
 ### Twitch/YouTube Integration
 - Auto-detect when a tracked match has a live stream
@@ -117,7 +112,7 @@ A companion web portal where users can manage their GameTime experience outside 
 | Phase | Revenue Stream | Pricing |
 |-------|---------------|---------|
 | v1.0 (Now) | Premium subscriptions via Ko-fi | $4.99/mo |
-| Phase 2 | Web Premium (same sub, web + Discord) | $4.99/mo |
+| Phase 2 | Web Premium access (same subscription, web + Discord) | $4.99/mo |
 | Phase 3 | Server Premium (per-server features) | $9.99/mo per server |
 | Phase 4 | Fantasy league entry (optional) | $1.99/season |
 | Phase 5 | API access for developers | $19.99/mo (10K req/day) |
@@ -127,6 +122,7 @@ A companion web portal where users can manage their GameTime experience outside 
 - Premium is about convenience and depth, not paywalling core features.
 - Server Premium targets community owners who want a dedicated match feed.
 - API access is a low-effort, high-margin revenue stream once the data pipeline is mature.
+- Treat mobile as optional upside, not a promised revenue driver.
 
 ---
 

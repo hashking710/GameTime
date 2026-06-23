@@ -5,6 +5,7 @@ import {
   ButtonStyle,
   ComponentType,
   EmbedBuilder,
+  MessageFlags,
   type ChatInputCommandInteraction,
 } from "discord.js";
 import { eq, asc } from "drizzle-orm";
@@ -26,7 +27,7 @@ export default {
     .setDescription("Show currently live matches (auto-updating scores)") as SlashCommandBuilder,
 
   async execute(interaction: ChatInputCommandInteraction) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const { db } = interaction.client;
 
     let allLive = deduplicateMatches(await fetchLiveMatches(db));

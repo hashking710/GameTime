@@ -13,8 +13,8 @@ GameTime runs as 4 independent Docker Compose stacks that communicate through sh
        ▼              ▼                  ▼            │
 ┌──────────────┐ ┌─────────┐  ┌──────────────────┐   │
 │  Stack 2:    │ │ Stack 4: │  │   Stack 5:       │   │
-│  Discord Bot │ │ Reverse  │  │   Web Portal     │   │
-│  + Webhook   │ │ Proxy    │  │   (WordPress)    │   │
+│  Discord Bot │ │ Reverse  │  │   Web App        │   │
+│  + Webhook   │ │ Proxy    │  │ (separate domain)│   │
 └──────┬───────┘ └────┬────┘  └────────┬─────────┘   │
        │              │                │              │
        ▼              ▼                ▼              ▼
@@ -242,12 +242,12 @@ networks:
 **Purpose:** SSL termination, domain routing, and rate limiting.
 
 **Services:**
-- `traefik` or `nginx` — Routes external traffic to the bot webhook and web portal
+- `traefik` or `nginx` — Routes external traffic to the bot webhook and GameTime web app
 
 **Routes:**
-- `gametime.yourdomain.com` → Stack 5 (WordPress web portal, port 80)
-- `gametime.yourdomain.com/api/kofi` → Stack 2 (bot webhook, port 3000)
-- `gametime.yourdomain.com/api/*` → Stack 5 (future REST API)
+- `app.gametime.<tbd>` → Stack 5 (GameTime web app, port 80)
+- `api.gametime.<tbd>` → Stack 5 (future REST API)
+- `webhook.gametime.<tbd>` → Stack 2 (bot webhook, port 3000)
 
 ```yaml
 # docker-compose.proxy.yml
@@ -283,63 +283,36 @@ networks:
 
 ---
 
-## Stack 5: Web Portal (Future)
+## Stack 5: Web App (Future)
 
-**Purpose:** Public-facing website for match schedules, odds dashboard, user account management, and premium subscription handling.
+**Purpose:** Public-facing GameTime web experience for match schedules, account settings, and light subscription handoff.
 
 **Services:**
-- `wordpress` — WordPress with custom GameTime plugin
-- `wp-db` — Separate MySQL for WordPress CMS content (or share postgres via plugin)
-
-**Or alternatively:**
 - `portal` — Next.js/Astro app reading directly from the GameTime PostgreSQL
+- `billing` — Optional lightweight integration service for payment provider webhooks
 
 **Communication pattern:**
 - **Reads** from PostgreSQL (matches, odds, teams — same data the bot uses)
-- **Writes** to PostgreSQL (user settings, subscription management)
+- **Writes** to PostgreSQL (user settings, subscription metadata)
 - **Receives** HTTP from users (web browser)
-- **Receives** HTTP from Ko-fi (alternative webhook endpoint)
+- **Receives** HTTP from payment provider webhooks
 - **Serves** static pages + dynamic match data
 
-### WordPress Plugin Approach
+### Web App Approach
 
-Since you can write WordPress plugins, the portal can work like this:
+The web app should stay separate from the HKR website. If HKR continues to exist, it is only an unrelated portfolio/payment portal and should not be treated as GameTime infrastructure.
 
 ```
-WordPress Site (your existing domain)
-  └── GameTime Plugin
-        ├── Shortcodes: [gametime_today], [gametime_live], [gametime_schedule game="nfl"]
-        ├── REST API: /wp-json/gametime/v1/matches, /odds, /teams
-        ├── Admin Panel: manage team aliases, view subscriber stats
-        ├── Ko-fi Webhook Handler: /wp-json/gametime/v1/kofi
-        │     └── Receives payment → calls GameTime PostgreSQL to set premium
-        └── User Dashboard: /my-gametime/
-              ├── Tracked teams (synced with Discord via discord_id)
-              ├── Odds preferences
-              ├── Notification settings
-              └── Subscription management
+GameTime-owned domain
+  ├── Public match pages
+  ├── Account settings
+  ├── Lightweight billing handoff
+  └── OAuth link to Discord account
 ```
 
-The WordPress plugin connects directly to the GameTime PostgreSQL database (same one the bot uses) via a PHP PostgreSQL driver or a lightweight REST API that sits in front of it.
+Payment providers can still post to both the bot and the web app if needed, but the web app should not depend on the HKR site being present.
 
-**Option A: Direct DB connection from WordPress**
-```php
-// wp-content/plugins/gametime/includes/db.php
-$gametime_db = pg_connect("host=postgres dbname=gametime user=gametime password=...");
-$matches = pg_query($gametime_db, "SELECT * FROM matches WHERE status = 'live'");
-```
-
-**Option B: REST API microservice (recommended)**
-A tiny Express/Fastify service in the GameTime monorepo that exposes a read-only REST API:
-```
-GET /api/matches?status=live&game=nfl
-GET /api/matches/:id/odds
-GET /api/teams?search=denver
-GET /api/user/:discordId/subscriptions
-POST /api/kofi (webhook)
-```
-
-WordPress calls this API. This keeps the database access pattern clean and avoids giving WordPress direct postgres credentials.
+The web app calls this API. This keeps the database access pattern clean and avoids giving the frontend direct postgres credentials.
 
 ---
 
@@ -382,8 +355,8 @@ WordPress calls this API. This keeps the database access pattern clean and avoid
               ┌────────────┼────────────────┐
               ▼            ▼                ▼
         ┌──────────┐ ┌──────────┐   ┌──────────────┐
-        │ Discord  │ │ Reminder │   │  Web Portal   │
-        │   Bot    │ │ Service  │   │  (WordPress)  │
+        │ Discord  │ │ Reminder │   │   Web App     │
+        │   Bot    │ │ Service  │   │ (separate)    │
         │          │ │          │   │               │
         │ /today   │ │ DMs at   │   │ Live scores   │
         │ /live    │ │ 60/30/15 │   │ Odds dashboard│
@@ -414,8 +387,8 @@ WordPress calls this API. This keeps the database access pattern clean and avoid
 1. **Stack 1 (Infrastructure)** — Start first, wait for healthchecks
 2. **Stack 3 (Collectors)** — Migration runs, then collectors start ingesting
 3. **Stack 2 (Bot)** — Connects to populated database, registers commands
-4. **Stack 4 (Proxy)** — Routes traffic to bot webhook + portal
-5. **Stack 5 (Portal)** — When ready, connects to same database
+4. **Stack 4 (Proxy)** — Routes traffic to bot webhook + web app
+5. **Stack 5 (Web App)** — When ready, connects to same database
 
 ## Scaling Strategy
 
@@ -426,7 +399,7 @@ WordPress calls this API. This keeps the database access pattern clean and avoid
 | Bot | Single instance (Discord gateway = 1 connection per bot) |
 | Collectors | Single instance each (rate-limited by APIs anyway) |
 | Reminder | Single instance (avoids duplicate notifications) |
-| Web Portal | Horizontal (multiple WordPress containers behind load balancer) |
+| Web App | Horizontal (multiple frontend containers behind load balancer) |
 | Proxy | Single instance (Traefik handles high throughput) |
 
 ## Environment Variables
@@ -454,43 +427,28 @@ SPORTSDB_API_KEY=3
 
 # Proxy-specific
 ACME_EMAIL=you@example.com
-DOMAIN=gametime.yourdomain.com
+DOMAIN=app.gametime.<tbd>
 ```
 
-## Ko-fi + WordPress Payment Flow
+## Payment Flow
 
 ```
 User runs /subscribe in Discord
-  └── Bot shows Premium features + Ko-fi link + user's Discord ID
-        └── User clicks "Subscribe on Ko-fi" button
-              └── Ko-fi checkout page ($4.99/month)
-                    └── User pastes Discord ID in message field
-                          └── Payment completes
-                                └── Ko-fi sends webhook POST
-                                      │
-                                      ├── Route A: Bot webhook (current)
-                                      │     └── POST /kofi on bot:3000
-                                      │           └── Parse Discord ID from message
-                                      │                 └── UPDATE users SET premium=true
-                                      │                       └── DM user "Welcome to Premium!"
-                                      │
-                                      └── Route B: WordPress plugin (future)
-                                            └── POST /wp-json/gametime/v1/kofi
-                                                  └── WordPress plugin validates token
-                                                        └── Calls GameTime DB or API
-                                                              └── Sets premium=true
-                                                              └── Sends confirmation email
-                                                              └── Updates WordPress user profile
+  └── Bot shows Premium features + payment link + account instructions
+    └── User completes checkout on the payment provider
+      └── Provider sends webhook POST
+        ├── Bot webhook updates premium status and DMs the user
+        └── Web app updates subscription status if that flow exists
 ```
 
-Both routes can coexist — Ko-fi supports multiple webhook URLs, so the bot gets notified (for the Discord DM) and WordPress gets notified (for the web dashboard update) simultaneously.
+The payment provider can notify both the bot and the web app, but the web app stays independent from the HKR site.
 
 ## What This Enables
 
 1. **Deploy bot updates** without touching collectors or database
 2. **Scale collectors** independently based on API rate limits
-3. **Add the web portal** without modifying any existing services
-4. **Replace WordPress** with Next.js later without touching the bot
+3. **Add the web app** without modifying any existing services
+4. **Swap the web app implementation** later without touching the bot
 5. **Move to managed PostgreSQL** (RDS, Supabase) by changing one env var
 6. **Add new data sources** by adding a new collector container
 7. **Run locally** with a single combined docker-compose.yml (current setup)

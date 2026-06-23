@@ -1,4 +1,4 @@
-import type { Interaction } from "discord.js";
+import { MessageFlags, type Interaction } from "discord.js";
 import { createLogger } from "@gametime/shared";
 import { checkRateLimit } from "../utils/ratelimit";
 
@@ -33,7 +33,7 @@ export async function handleInteraction(interaction: Interaction) {
     interaction.commandName,
   );
   if (rateLimitMsg) {
-    await interaction.reply({ content: rateLimitMsg, ephemeral: true });
+    await interaction.reply({ content: rateLimitMsg, flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -43,12 +43,11 @@ export async function handleInteraction(interaction: Interaction) {
     logger.error({ err, command: interaction.commandName }, "Command error");
     const reply = {
       content: "Something went wrong. Please try again later.",
-      ephemeral: true,
     };
     if (interaction.deferred || interaction.replied) {
       await interaction.editReply(reply);
     } else {
-      await interaction.reply(reply);
+      await interaction.reply({ ...reply, flags: MessageFlags.Ephemeral });
     }
   }
 }
