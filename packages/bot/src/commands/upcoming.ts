@@ -10,7 +10,7 @@ import { type OddsFormat } from "@gametime/shared";
 import { buildMatchEmbed, buildMatchWithOddsEmbed } from "../utils/embeds";
 import { getUserTier } from "../utils/tier";
 import { sendPaginated } from "../utils/pagination";
-import { deduplicateMatches } from "../utils/dedup";
+import { deduplicateMatches, getMergedMatchIds } from "../utils/dedup";
 import { parseGameOption } from "../utils/game";
 import { withGameChoices } from "../utils/command-options";
 import { noMatchesMessage, unsupportedGameFilterMessage } from "../utils/command-messages";
@@ -85,13 +85,23 @@ export default {
       oddsFormat = userRows[0].oddsFormat as OddsFormat;
     }
 
-    const matchIds = sortedMatches.map((m) => m.id);
+    const allMergedIds = sortedMatches.flatMap((m) => getMergedMatchIds(m.id));
     const allOdds = await db
       .select()
       .from(odds)
-      .where(inArray(odds.matchId, matchIds));
+      .where(inArray(odds.matchId, allMergedIds));
 
-    const oddsByMatch = Map.groupBy(allOdds, (o) => o.matchId);
+    // Group odds by the deduped match ID (not the source match ID)
+    const oddsByMatch = new Map<string, typeof allOdds>();
+    for (const o of allOdds) {
+      for (const m of sortedMatches) {
+        if (getMergedMatchIds(m.id).includes(o.matchId)) {
+          if (!oddsByMatch.has(m.id)) oddsByMatch.set(m.id, []);
+          oddsByMatch.get(m.id)!.push(o);
+          break;
+        }
+      }
+    }
 
     const embeds = sortedMatches.map((match) =>
       buildMatchWithOddsEmbed(match, oddsByMatch.get(match.id) ?? [], oddsFormat),

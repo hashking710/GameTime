@@ -20,8 +20,16 @@ const SPORTS_SOURCE_PRIORITY: Record<string, number> = {
   pandascore: 3,
 };
 
+// Maps a deduped match ID to all source match IDs that were merged into it
+let _lastMergedIds = new Map<string, string[]>();
+
+export function getMergedMatchIds(matchId: string): string[] {
+  return _lastMergedIds.get(matchId) ?? [matchId];
+}
+
 export function deduplicateMatches(all: Match[]): Match[] {
   const groups = new Map<string, Match>();
+  const idGroups = new Map<string, string[]>();
 
   for (const match of all) {
     const key = getDedupKey(match);
@@ -29,10 +37,18 @@ export function deduplicateMatches(all: Match[]): Match[] {
 
     if (!existing) {
       groups.set(key, match);
+      idGroups.set(key, [match.id]);
       continue;
     }
 
-    groups.set(key, mergeMatches(existing, match));
+    const merged = mergeMatches(existing, match);
+    groups.set(key, merged);
+    idGroups.get(key)!.push(match.id);
+  }
+
+  _lastMergedIds = new Map();
+  for (const [key, match] of groups) {
+    _lastMergedIds.set(match.id, idGroups.get(key) ?? [match.id]);
   }
 
   return Array.from(groups.values());

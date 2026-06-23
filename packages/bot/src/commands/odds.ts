@@ -11,6 +11,7 @@ import { requirePremium } from "../utils/tier";
 import { parseGameOption } from "../utils/game";
 import { withGameChoices } from "../utils/command-options";
 import { noMatchesMessage, unsupportedGameFilterMessage } from "../utils/command-messages";
+import { deduplicateMatches, getMergedMatchIds } from "../utils/dedup";
 
 export default {
   data: new SlashCommandBuilder()
@@ -48,7 +49,9 @@ export default {
       .orderBy(asc(matches.startTime))
       .limit(5);
 
-    if (upcoming.length === 0) {
+    const deduped = deduplicateMatches(upcoming);
+
+    if (deduped.length === 0) {
       await interaction.editReply(noMatchesMessage("odds"));
       return;
     }
@@ -63,15 +66,24 @@ export default {
       oddsFormat = userRows[0].oddsFormat as OddsFormat;
     }
 
-    const matchIds = upcoming.map((m) => m.id);
+    const allMergedIds = deduped.flatMap((m) => getMergedMatchIds(m.id));
     const allOdds = await db
       .select()
       .from(odds)
-      .where(inArray(odds.matchId, matchIds));
+      .where(inArray(odds.matchId, allMergedIds));
 
-    const oddsByMatch = Map.groupBy(allOdds, (o) => o.matchId);
+    const oddsByMatch = new Map<string, typeof allOdds>();
+    for (const o of allOdds) {
+      for (const m of deduped) {
+        if (getMergedMatchIds(m.id).includes(o.matchId)) {
+          if (!oddsByMatch.has(m.id)) oddsByMatch.set(m.id, []);
+          oddsByMatch.get(m.id)!.push(o);
+          break;
+        }
+      }
+    }
 
-    const embeds = upcoming.map((match) =>
+    const embeds = deduped.map((match) =>
       buildMatchWithOddsEmbed(match, oddsByMatch.get(match.id) ?? [], oddsFormat),
     );
 
