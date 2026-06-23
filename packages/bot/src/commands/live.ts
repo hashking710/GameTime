@@ -37,7 +37,7 @@ export default {
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(stopButton);
 
-    const embeds = liveMatches.slice(0, 10).map(buildMatchEmbed);
+    const embeds = liveMatches.slice(0, 9).map(buildMatchEmbed);
     const footer = buildFooterEmbed(liveMatches.length);
 
     const message = await interaction.editReply({
@@ -91,7 +91,7 @@ export default {
           return;
         }
 
-        const updatedEmbeds = updated.slice(0, 10).map(buildMatchEmbed);
+        const updatedEmbeds = updated.slice(0, 9).map(buildMatchEmbed);
         const updatedFooter = buildFooterEmbed(updated.length);
         await interaction.editReply({
           embeds: [...updatedEmbeds, updatedFooter],
