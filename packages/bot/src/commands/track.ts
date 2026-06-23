@@ -73,17 +73,38 @@ export default {
       return;
     }
 
-    await db.insert(userSubscriptions).values({ discordId, teamId });
-
-    const team = await db
+    const selectedTeam = await db
       .select()
       .from(teams)
       .where(eq(teams.id, teamId))
       .limit(1);
 
-    const displayName = team[0]?.canonicalName ?? team[0]?.name ?? "Unknown";
+    const canonical = selectedTeam[0]?.canonicalName ?? selectedTeam[0]?.name;
+    if (!canonical) {
+      await interaction.editReply("Team not found.");
+      return;
+    }
+
+    const allVariants = await db
+      .select({ id: teams.id })
+      .from(teams)
+      .where(
+        sql`(${teams.canonicalName} = ${canonical} OR ${teams.name} = ${canonical})`,
+      );
+
+    const existingTeamIds = new Set(existingSubs.map((s) => s.teamId));
+    let added = 0;
+    for (const variant of allVariants) {
+      if (existingTeamIds.has(variant.id)) continue;
+      await db
+        .insert(userSubscriptions)
+        .values({ discordId, teamId: variant.id })
+        .onConflictDoNothing();
+      added++;
+    }
+
     await interaction.editReply(
-      `Now tracking **${displayName}**! You'll be notified before their matches across all games.`,
+      `Now tracking **${canonical}**! You'll be notified before their matches across all sources.`,
     );
   },
 };

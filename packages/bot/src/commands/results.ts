@@ -2,21 +2,21 @@ import {
   SlashCommandBuilder,
   type ChatInputCommandInteraction,
 } from "discord.js";
-import { eq, gte, and, asc } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { matches } from "@gametime/db";
 import { buildMatchEmbed } from "../utils/embeds";
-import { sendPaginated } from "../utils/pagination";
 import { deduplicateMatches } from "../utils/dedup";
+import { sendPaginated } from "../utils/pagination";
 
 export default {
   data: new SlashCommandBuilder()
-    .setName("schedule")
-    .setDescription("Show full schedule for a game")
+    .setName("results")
+    .setDescription("Recent match results")
     .addStringOption((opt) =>
       opt
         .setName("game")
-        .setDescription("Game to filter (e.g. cs2, nba, lol)")
-        .setRequired(true)
+        .setDescription("Filter by game")
+        .setRequired(false)
         .addChoices(
           { name: "CS2", value: "cs2" },
           { name: "Valorant", value: "valorant" },
@@ -36,30 +36,28 @@ export default {
   async execute(interaction: ChatInputCommandInteraction) {
     await interaction.deferReply({ ephemeral: true });
     const { db } = interaction.client;
-    const game = interaction.options.getString("game", true);
+    const gameFilter = interaction.options.getString("game");
 
-    const upcoming = await db
+    const conditions = [eq(matches.status, "completed")];
+    if (gameFilter) {
+      conditions.push(eq(matches.game, gameFilter as any));
+    }
+
+    const completed = await db
       .select()
       .from(matches)
-      .where(
-        and(
-          eq(matches.game, game as any),
-          gte(matches.startTime, new Date()),
-        ),
-      )
-      .orderBy(asc(matches.startTime))
-      .limit(25);
+      .where(and(...conditions))
+      .orderBy(desc(matches.startTime))
+      .limit(30);
 
-    const dedupedMatches = deduplicateMatches(upcoming);
+    const deduped = deduplicateMatches(completed);
 
-    if (dedupedMatches.length === 0) {
-      await interaction.editReply(
-        `No upcoming ${game.toUpperCase()} matches found.`,
-      );
+    if (deduped.length === 0) {
+      await interaction.editReply("No recent results found.");
       return;
     }
 
-    const embeds = dedupedMatches.map(buildMatchEmbed);
+    const embeds = deduped.map(buildMatchEmbed);
     await sendPaginated(interaction, embeds);
   },
 };

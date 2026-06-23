@@ -11,6 +11,7 @@ import { eq, asc } from "drizzle-orm";
 import { matches } from "@gametime/db";
 import type { Database } from "@gametime/db";
 import { buildMatchEmbed } from "../utils/embeds";
+import { deduplicateMatches } from "../utils/dedup";
 
 const UPDATE_INTERVAL_MS = 30_000;
 const MAX_DURATION_MS = 2 * 60 * 60 * 1000;
@@ -25,7 +26,7 @@ export default {
     await interaction.deferReply({ ephemeral: true });
     const { db } = interaction.client;
 
-    let allLive = await fetchLiveMatches(db);
+    let allLive = deduplicateMatches(await fetchLiveMatches(db));
 
     if (allLive.length === 0) {
       await interaction.editReply("No matches are live right now.");
@@ -139,7 +140,7 @@ export default {
           return;
         }
 
-        allLive = updated;
+        allLive = deduplicateMatches(updated);
         await interaction.editReply(buildMessage(allLive));
       } catch {}
     }, UPDATE_INTERVAL_MS);

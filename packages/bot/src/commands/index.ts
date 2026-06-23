@@ -15,6 +15,7 @@ import tierCommand from "./tier";
 import settingsCommand from "./settings";
 import subscribeCommand from "./subscribe";
 import helpCommand from "./help";
+import resultsCommand from "./results";
 
 export interface Command {
   data: SlashCommandBuilder;
@@ -35,5 +36,6 @@ export function loadCommands(): Command[] {
     settingsCommand,
     subscribeCommand,
     helpCommand,
+    resultsCommand,
   ];
 }

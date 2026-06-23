@@ -9,6 +9,7 @@ import { isValidGame, type OddsFormat } from "@gametime/shared";
 import { buildMatchEmbed, buildMatchWithOddsEmbed } from "../utils/embeds";
 import { getUserTier } from "../utils/tier";
 import { sendPaginated } from "../utils/pagination";
+import { deduplicateMatches } from "../utils/dedup";
 
 export default {
   data: new SlashCommandBuilder()
@@ -66,13 +67,15 @@ export default {
       CacheTTL.UPCOMING,
     );
 
-    if (upcomingMatches.length === 0) {
+    const dedupedMatches = deduplicateMatches(upcomingMatches);
+
+    if (dedupedMatches.length === 0) {
       await interaction.editReply("No upcoming matches found.");
       return;
     }
 
     if (!tier.hasOdds) {
-      const embeds = upcomingMatches.map(buildMatchEmbed);
+      const embeds = dedupedMatches.map(buildMatchEmbed);
       await sendPaginated(interaction, embeds);
       return;
     }
@@ -87,7 +90,7 @@ export default {
       oddsFormat = userRows[0].oddsFormat as OddsFormat;
     }
 
-    const matchIds = upcomingMatches.map((m) => m.id);
+    const matchIds = dedupedMatches.map((m) => m.id);
     const allOdds = await db
       .select()
       .from(odds)
@@ -95,7 +98,7 @@ export default {
 
     const oddsByMatch = Map.groupBy(allOdds, (o) => o.matchId);
 
-    const embeds = upcomingMatches.map((match) =>
+    const embeds = dedupedMatches.map((match) =>
       buildMatchWithOddsEmbed(match, oddsByMatch.get(match.id) ?? [], oddsFormat),
     );
 

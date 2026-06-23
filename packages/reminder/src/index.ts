@@ -7,6 +7,7 @@ import { findPendingNotifications } from "./checker";
 import { sendNotifications } from "./notifier";
 import { sendDailyDigests } from "./digest";
 import { checkUpsetAlerts, checkLineMovementAlerts } from "./alerts";
+import { cleanupStaleData } from "./cleanup";
 
 const env = loadEnv(
   z.object({
@@ -52,6 +53,15 @@ client.once("ready", () => {
       await checkLineMovementAlerts(db, client, sentCache);
     } catch (err) {
       logger.error({ err }, "Line movement alert cycle failed");
+    }
+  });
+
+  // Stale data cleanup — daily at 3 AM UTC
+  cron.schedule("0 3 * * *", async () => {
+    try {
+      await cleanupStaleData(db);
+    } catch (err) {
+      logger.error({ err }, "Cleanup failed");
     }
   });
 

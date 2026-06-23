@@ -7,6 +7,7 @@ import { matches } from "@gametime/db";
 import { getOrSet, CacheKeys, CacheTTL } from "@gametime/cache";
 import { buildMatchEmbed } from "../utils/embeds";
 import { sendPaginated } from "../utils/pagination";
+import { deduplicateMatches } from "../utils/dedup";
 
 export default {
   data: new SlashCommandBuilder()
@@ -44,12 +45,14 @@ export default {
       CacheTTL.TODAY,
     );
 
-    if (todayMatches.length === 0) {
+    const dedupedMatches = deduplicateMatches(todayMatches);
+
+    if (dedupedMatches.length === 0) {
       await interaction.editReply("No matches scheduled for today.");
       return;
     }
 
-    const embeds = todayMatches.map(buildMatchEmbed);
+    const embeds = dedupedMatches.map(buildMatchEmbed);
     await sendPaginated(interaction, embeds);
   },
 };

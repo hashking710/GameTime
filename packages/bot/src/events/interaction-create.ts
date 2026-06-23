@@ -1,5 +1,6 @@
 import type { Interaction } from "discord.js";
 import { createLogger } from "@gametime/shared";
+import { checkRateLimit } from "../utils/ratelimit";
 
 const logger = createLogger("bot:interaction");
 
@@ -23,6 +24,12 @@ export async function handleInteraction(interaction: Interaction) {
   const command = interaction.client.commands.get(interaction.commandName);
   if (!command) {
     logger.warn({ command: interaction.commandName }, "Unknown command");
+    return;
+  }
+
+  const rateLimitMsg = checkRateLimit(interaction.user.id, interaction.commandName);
+  if (rateLimitMsg) {
+    await interaction.reply({ content: rateLimitMsg, ephemeral: true });
     return;
   }
 
