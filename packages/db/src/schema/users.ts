@@ -10,6 +10,7 @@ export const users = pgTable("users", {
   mutedGames: jsonb("muted_games").$type<string[]>().notNull().default([]),
   favoriteTeams: jsonb("favorite_teams").$type<string[]>().notNull().default([]),
   favoriteLeagues: jsonb("favorite_leagues").$type<string[]>().notNull().default([]),
+  notifyScoreUpdates: boolean("notify_score_updates").notNull().default(true),
   premiumExpiresAt: timestamp("premium_expires_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()

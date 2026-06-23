@@ -7,6 +7,7 @@ import { findPendingNotifications } from "./checker";
 import { sendNotifications } from "./notifier";
 import { sendDailyDigests } from "./digest";
 import { checkUpsetAlerts, checkLineMovementAlerts } from "./alerts";
+import { checkScoreAlerts } from "./score-alerts";
 import { cleanupStaleData } from "./cleanup";
 import { checkWatchedMatches } from "./watch-notifier";
 
@@ -14,7 +15,15 @@ const env = loadEnv(
   z.object({
     DISCORD_TOKEN: z.string(),
     DATABASE_URL: z.string(),
+    ADMIN_USER_IDS: z.string().optional(),
   }),
+);
+
+const adminUserIds = new Set(
+  (env.ADMIN_USER_IDS ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean),
 );
 
 const logger = createLogger("reminder");
@@ -54,6 +63,15 @@ client.once("clientReady", () => {
       await checkLineMovementAlerts(db, client, sentCache);
     } catch (err) {
       logger.error({ err }, "Line movement alert cycle failed");
+    }
+  });
+
+  // Score & win alerts — every 2 minutes
+  cron.schedule("*/2 * * * *", async () => {
+    try {
+      await checkScoreAlerts(db, client, sentCache, adminUserIds);
+    } catch (err) {
+      logger.error({ err }, "Score alert cycle failed");
     }
   });
 

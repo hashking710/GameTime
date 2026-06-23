@@ -1,6 +1,7 @@
 {
   "name": "@gametime/collector-riot",
   "version": "0.0.1",
+  "author": "Hash King",
   "private": true,
   "type": "module",
   "scripts": {

@@ -105,6 +105,12 @@ export default {
         .setName("clear_preferences")
         .setDescription("Clear muted games and favorites")
         .setRequired(false),
+    )
+    .addBooleanOption((opt) =>
+      opt
+        .setName("score_alerts")
+        .setDescription("Enable or disable score/win alerts for tracked games")
+        .setRequired(false),
     ) as SlashCommandBuilder,
 
   async execute(interaction: ChatInputCommandInteraction) {
@@ -120,6 +126,7 @@ export default {
     const favoriteTeamRaw = interaction.options.getString("favorite_team");
     const favoriteLeagueRaw = interaction.options.getString("favorite_league");
     const clearPreferences = interaction.options.getBoolean("clear_preferences") ?? false;
+    const scoreAlerts = interaction.options.getBoolean("score_alerts");
 
     await db
       .insert(users)
@@ -142,6 +149,11 @@ export default {
         ? "American (-118)"
         : "Decimal (1.85)";
       confirmations.push(`Odds format: **${label}**`);
+    }
+
+    if (scoreAlerts !== null) {
+      updates.notifyScoreUpdates = scoreAlerts;
+      confirmations.push(`Score/win alerts: **${scoreAlerts ? "On" : "Off"}**`);
     }
 
     if (timezone) {
@@ -234,6 +246,7 @@ export default {
         `Muted games: **${((user?.mutedGames as string[] | undefined) ?? []).map((g) => g.toUpperCase()).join(", ") || "None"}**`,
         `Favorite teams: **${((user?.favoriteTeams as string[] | undefined) ?? []).join(", ") || "None"}**`,
         `Favorite leagues: **${((user?.favoriteLeagues as string[] | undefined) ?? []).join(", ") || "None"}**`,
+        `Score/win alerts: **${user?.notifyScoreUpdates !== false ? "On" : "Off"}**`,
         `Daily digest: **8:00 AM** in your timezone`,
         "",
         "Use `/settings` options to update preferences.",
