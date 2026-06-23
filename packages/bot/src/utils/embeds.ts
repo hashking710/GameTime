@@ -76,7 +76,7 @@ export function buildMatchEmbed(match: Match): EmbedBuilder {
 
     // Esports: map-by-map breakdown
     if (details?.games && details.games.length > 0) {
-      const gameLines = formatSubGames(details.games, match.team1, match.team2);
+      const gameLines = formatSubGames(details.games, match.team1, match.team2, match.status === "completed");
       if (gameLines) {
         embed.addFields({
           name: details.format ? `Maps (${details.format.toUpperCase()})` : "Maps",
@@ -123,26 +123,33 @@ export function buildMatchWithOddsEmbed(
   const embed = buildMatchEmbed(match);
 
   if (matchOdds.length === 0) {
-    embed.addFields({ name: "Odds", value: "No odds available" });
     return embed;
   }
 
-  // Try moneyline first, fallback to any available market
-  let oddsToShow = matchOdds.filter((o) => o.market === "moneyline");
-  if (oddsToShow.length === 0) {
-    oddsToShow = matchOdds.slice(0, 5);
+  const moneyline = matchOdds.filter((o) => o.market === "moneyline");
+  const spreads = matchOdds.filter((o) => o.market === "spread");
+  const totals = matchOdds.filter((o) => o.market === "total");
+
+  if (moneyline.length > 0) {
+    const lines = moneyline.slice(0, 4).map((o) =>
+      `**${o.bookmaker}**: ${formatOdds(o.team1Odds, oddsFormat)} / ${formatOdds(o.team2Odds, oddsFormat)}${o.drawOdds ? ` / ${formatOdds(o.drawOdds, oddsFormat)}` : ""}`,
+    ).join("\n");
+    embed.addFields({ name: oddsFormat === "american" ? "Moneyline (American)" : "Moneyline", value: lines });
   }
 
-  const oddsLines = oddsToShow
-    .slice(0, 5)
-    .map(
-      (o) =>
-        `**${o.bookmaker}** (${o.market}): ${formatOdds(o.team1Odds, oddsFormat)} / ${formatOdds(o.team2Odds, oddsFormat)}${o.drawOdds ? ` / ${formatOdds(o.drawOdds, oddsFormat)}` : ""}`,
-    )
-    .join("\n");
+  if (spreads.length > 0) {
+    const lines = spreads.slice(0, 3).map((o) =>
+      `**${o.bookmaker}**: ${o.spreadValue ?? ""} @ ${formatOdds(o.team1Odds, oddsFormat)} / ${formatOdds(o.team2Odds, oddsFormat)}`,
+    ).join("\n");
+    embed.addFields({ name: "Spread", value: lines, inline: true });
+  }
 
-  const label = oddsFormat === "american" ? "Odds (American)" : "Odds";
-  embed.addFields({ name: label, value: oddsLines });
+  if (totals.length > 0) {
+    const lines = totals.slice(0, 3).map((o) =>
+      `**${o.bookmaker}**: O/U ${o.totalValue ?? ""} @ ${formatOdds(o.overOdds ?? o.team1Odds, oddsFormat)} / ${formatOdds(o.underOdds ?? o.team2Odds, oddsFormat)}`,
+    ).join("\n");
+    embed.addFields({ name: "Total", value: lines, inline: true });
+  }
 
   return embed;
 }
@@ -151,12 +158,14 @@ function formatSubGames(
   games: MatchSubGame[],
   team1Name: string,
   _team2Name: string,
+  matchCompleted = false,
 ): string {
   return games
     .map((g) => {
       const label = `Map ${g.position}`;
-      if (g.status === "not_started") return `${label}: -`;
-      if (g.status === "running") return `${label}: :red_circle: **LIVE**`;
+      const effectiveStatus = matchCompleted && g.status === "running" ? "finished" : g.status;
+      if (effectiveStatus === "not_started") return `${label}: -`;
+      if (effectiveStatus === "running") return `${label}: :red_circle: **LIVE**`;
 
       const winner = g.winnerName;
       const duration = g.duration
