@@ -12,6 +12,7 @@ export interface PendingNotification {
   tournament: string;
   startTime: Date;
   minutesUntil: number;
+  streamUrl: string | null;
 }
 
 export async function findPendingNotifications(
@@ -30,6 +31,7 @@ export async function findPendingNotifications(
       game: matches.game,
       tournament: matches.tournament,
       startTime: matches.startTime,
+      streamUrl: matches.streamUrl,
       notify60min: userSubscriptions.notify60min,
       notify30min: userSubscriptions.notify30min,
       notify15min: userSubscriptions.notify15min,
@@ -85,6 +87,7 @@ export async function findPendingNotifications(
         game: r.game,
         tournament: r.tournament,
         startTime: r.startTime,
+        streamUrl: r.streamUrl,
         minutesUntil,
       };
     })

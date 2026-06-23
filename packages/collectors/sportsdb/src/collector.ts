@@ -23,7 +23,6 @@ export class SportsDbCollector extends BaseCollector {
   }
 
   async collect(): Promise<UnifiedMatch[]> {
-    this.logger.info("Fetching SportsDB events...");
     const allMatches: UnifiedMatch[] = [];
 
     for (const [leagueId, game] of Object.entries(SPORTSDB_LEAGUE_MAP)) {
@@ -60,7 +59,6 @@ export class SportsDbCollector extends BaseCollector {
     super.start();
 
     // ESPN live score updates every 2 minutes
-    this.logger.info("Starting ESPN live score updater (every 2 min)");
     const tickEspn = async () => {
       try {
         await updateLiveScores(this.db, this.redis);

@@ -5,7 +5,8 @@ import {
   type ChatInputCommandInteraction,
 } from "discord.js";
 import { eq } from "drizzle-orm";
-import { users, userSubscriptions } from "@gametime/db";
+import { userSubscriptions } from "@gametime/db";
+import { getUserTier } from "../utils/tier";
 
 export default {
   data: new SlashCommandBuilder()
@@ -17,22 +18,13 @@ export default {
     const { db } = interaction.client;
     const discordId = interaction.user.id;
 
-    const userRows = await db
-      .select()
-      .from(users)
-      .where(eq(users.discordId, discordId))
-      .limit(1);
-
     const subCount = await db
       .select()
       .from(userSubscriptions)
       .where(eq(userSubscriptions.discordId, discordId));
 
-    const isPremium =
-      userRows.length > 0 &&
-      userRows[0].premium &&
-      (!userRows[0].premiumExpiresAt ||
-        userRows[0].premiumExpiresAt > new Date());
+    const tier = await getUserTier(interaction);
+    const isPremium = tier.hasOdds;
 
     const embed = new EmbedBuilder()
       .setTitle("Your GameTime Plan")
@@ -45,7 +37,7 @@ export default {
         },
         {
           name: "Teams Tracked",
-          value: `${subCount.length}/${isPremium ? "Unlimited" : "3"}`,
+          value: `${subCount.length}/${tier.maxTeams}`,
           inline: true,
         },
         {

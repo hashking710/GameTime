@@ -33,17 +33,14 @@ export class OddsCollector {
   ) {}
 
   async collectEsportsOdds(): Promise<UnifiedOdds[]> {
-    this.logger.info("Fetching esports odds from PandaScore...");
     return fetchPandaScoreOdds(this.pandaScoreApiKey);
   }
 
   async collectTraditionalOdds(): Promise<UnifiedOdds[]> {
-    this.logger.info("Fetching traditional sports odds from TheOddsAPI...");
     return fetchTheOddsApiOdds(this.oddsApiKey);
   }
 
   async collectSupplementalOdds(): Promise<UnifiedOdds[]> {
-    this.logger.info("Fetching supplemental odds from Pinnacle...");
     return fetchPinnacleOdds();
   }
 
@@ -88,7 +85,8 @@ export class OddsCollector {
         }
       }
 
-      const matchRows = await this.db
+      // Try to find match by source first (exact match)
+      let matchRows = await this.db
         .select({ id: matches.id })
         .from(matches)
         .where(
@@ -99,7 +97,92 @@ export class OddsCollector {
         )
         .limit(1);
 
-      if (matchRows.length === 0) continue;
+      // Fallback 1: match by game + team names (exact match)
+      if (matchRows.length === 0 && o.matchInfo) {
+        matchRows = await this.db
+          .select({ id: matches.id })
+          .from(matches)
+          .where(
+            and(
+              eq(matches.game, o.game),
+              eq(matches.team1, o.matchInfo.team1Name),
+              eq(matches.team2, o.matchInfo.team2Name),
+            ),
+          )
+          .limit(1);
+      }
+
+      // Fallback 2: match by game + fuzzy team names (case-insensitive, contains)
+      if (matchRows.length === 0 && o.matchInfo) {
+        this.logger.debug(
+          {
+            game: o.game,
+            team1: o.matchInfo.team1Name,
+            team2: o.matchInfo.team2Name,
+          },
+          "Attempting fuzzy cross-source match",
+        );
+        matchRows = await this.db
+          .select({ id: matches.id })
+          .from(matches)
+          .where(
+            and(
+              eq(matches.game, o.game),
+              sql`(
+                ${matches.team1} ILIKE '%' || ${o.matchInfo.team1Name} || '%'
+                OR ${matches.team1} ILIKE ${o.matchInfo.team1Name}
+              )`,
+              sql`(
+                ${matches.team2} ILIKE '%' || ${o.matchInfo.team2Name} || '%'
+                OR ${matches.team2} ILIKE ${o.matchInfo.team2Name}
+              )`,
+            ),
+          )
+          .limit(1);
+      }
+
+      // Fallback 3: Try swapped team order with fuzzy matching
+      if (matchRows.length === 0 && o.matchInfo) {
+        this.logger.debug(
+          {
+            game: o.game,
+            team1: o.matchInfo.team2Name,
+            team2: o.matchInfo.team1Name,
+          },
+          "Attempting fuzzy cross-source match with swapped teams",
+        );
+        matchRows = await this.db
+          .select({ id: matches.id })
+          .from(matches)
+          .where(
+            and(
+              eq(matches.game, o.game),
+              sql`(
+                ${matches.team1} ILIKE '%' || ${o.matchInfo.team2Name} || '%'
+                OR ${matches.team1} ILIKE ${o.matchInfo.team2Name}
+              )`,
+              sql`(
+                ${matches.team2} ILIKE '%' || ${o.matchInfo.team1Name} || '%'
+                OR ${matches.team2} ILIKE ${o.matchInfo.team1Name}
+              )`,
+            ),
+          )
+          .limit(1);
+      }
+
+      if (matchRows.length === 0) {
+        if (o.matchInfo) {
+          this.logger.warn(
+            {
+              game: o.game,
+              team1: o.matchInfo.team1Name,
+              team2: o.matchInfo.team2Name,
+            },
+            "No match found for odds",
+          );
+        }
+        continue;
+      }
       const matchId = matchRows[0].id;
 
       await this.db

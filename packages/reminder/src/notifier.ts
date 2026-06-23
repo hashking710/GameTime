@@ -20,16 +20,22 @@ export async function sendNotifications(
       const user = await client.users.fetch(notif.discordId);
       const emoji = GAME_EMOJI[notif.game] ?? ":trophy:";
 
+      const messageLines = [
+        `**Match Alert!** ${emoji}`,
+        `**${notif.team1}** vs **${notif.team2}**`,
+        `Tournament: ${notif.tournament}`,
+        `Game: ${notif.game.toUpperCase()}`,
+        bucket === 0
+          ? "**Starting NOW!**"
+          : `Starting in ~${bucket} minutes!`,
+      ];
+
+      if (notif.streamUrl) {
+        messageLines.push(`[Watch Live](${notif.streamUrl})`);
+      }
+
       await user.send({
-        content: [
-          `**Match Alert!** ${emoji}`,
-          `**${notif.team1}** vs **${notif.team2}**`,
-          `Tournament: ${notif.tournament}`,
-          `Game: ${notif.game.toUpperCase()}`,
-          bucket === 0
-            ? "**Starting NOW!**"
-            : `Starting in ~${bucket} minutes!`,
-        ].join("\n"),
+        content: messageLines.join("\n"),
       });
 
       sentCache.add(dedupeKey);

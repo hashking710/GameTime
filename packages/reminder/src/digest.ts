@@ -96,7 +96,11 @@ export async function sendDailyDigests(
       const lines = relevant.map((m) => {
         const emoji = GAME_EMOJI[m.game] ?? ":trophy:";
         const time = `<t:${Math.floor(m.startTime.getTime() / 1000)}:t>`;
-        return `${emoji} **${m.team1}** vs **${m.team2}** — ${time}`;
+        let line = `${emoji} **${m.team1}** vs **${m.team2}** — ${time}`;
+        if (m.streamUrl) {
+          line += ` • [Watch](${m.streamUrl})`;
+        }
+        return line;
       });
 
       const user = await client.users.fetch(discordId);

@@ -1,6 +1,5 @@
 import {
   loadEnv,
-  createLogger,
   onShutdown,
   validatePandaScoreApiKey,
 } from "@gametime/shared";
@@ -17,7 +16,6 @@ const env = loadEnv(
   }),
 );
 
-const logger = createLogger("collector-pandascore");
 const db = getDb(env.DATABASE_URL);
 const redis = getRedis(env.REDIS_URL);
 
@@ -30,8 +28,6 @@ const collector = new PandaScoreMatchCollector(
 );
 await validatePandaScoreApiKey(env.PANDASCORE_API_KEY, "collector-pandascore");
 collector.start();
-
-logger.info("PandaScore esports match collector started");
 
 onShutdown(async () => {
   redis.disconnect();

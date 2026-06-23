@@ -1,4 +1,4 @@
-import { loadEnv, createLogger, onShutdown } from "@gametime/shared";
+import { loadEnv, onShutdown } from "@gametime/shared";
 import { getDb } from "@gametime/db";
 import { getRedis } from "@gametime/cache";
 import { SportsDbCollector } from "./collector";
@@ -12,7 +12,6 @@ const env = loadEnv(
   }),
 );
 
-const logger = createLogger("collector-sportsdb");
 const db = getDb(env.DATABASE_URL);
 const redis = getRedis(env.REDIS_URL);
 
@@ -24,8 +23,6 @@ const collector = new SportsDbCollector(
   env.SPORTSDB_API_KEY,
 );
 collector.start();
-
-logger.info("SportsDB collector started");
 
 onShutdown(async () => {
   redis.disconnect();

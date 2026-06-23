@@ -1,7 +1,15 @@
 import { EmbedBuilder } from "discord.js";
 import type { InferSelectModel } from "drizzle-orm";
 import type { matches, odds } from "@gametime/db";
-import { formatOdds, GAME_EMOJI, type OddsFormat, type MatchDetails, type MatchSubGame, type MatchPeriod } from "@gametime/shared";
+import {
+  formatOdds,
+  GAME_EMOJI,
+  sanitizeImageUrl,
+  type OddsFormat,
+  type MatchDetails,
+  type MatchSubGame,
+  type MatchPeriod,
+} from "@gametime/shared";
 
 type Match = InferSelectModel<typeof matches>;
 type Odds = InferSelectModel<typeof odds>;
@@ -15,13 +23,15 @@ const STATUS_COLOR = {
 export function buildMatchEmbed(match: Match): EmbedBuilder {
   const emoji = GAME_EMOJI[match.game] ?? ":trophy:";
   const details = match.details as MatchDetails | null;
+  const logoUrl = sanitizeImageUrl(details?.team1Logo) ?? sanitizeImageUrl(details?.team2Logo);
   const embed = new EmbedBuilder()
     .setTitle(`${emoji} ${match.team1} vs ${match.team2}`)
     .setColor(STATUS_COLOR[match.status as keyof typeof STATUS_COLOR]);
 
-  if (details?.team1Logo) {
-    embed.setThumbnail(details.team1Logo);
+  if (logoUrl) {
+    embed.setThumbnail(logoUrl);
   }
+
 
   embed.addFields(
       { name: "Game", value: match.game.toUpperCase(), inline: true },
@@ -34,11 +44,35 @@ export function buildMatchEmbed(match: Match): EmbedBuilder {
     );
 
   if (match.status === "live" || match.status === "completed") {
-    let scoreValue = `**${match.team1Score ?? 0} - ${match.team2Score ?? 0}**`;
-    if (details?.clock && match.status === "live") {
-      scoreValue += `\n${details.clock}`;
+    const hasScore = match.team1Score != null || match.team2Score != null;
+    const hasFinishedGames = details?.games?.some(
+      (game) =>
+        game.status !== "not_started" ||
+        game.team1Score != null ||
+        game.team2Score != null ||
+        game.winnerName != null,
+    );
+    const hasPeriodScores = details?.periods?.some(
+      (period) => period.team1Score != null || period.team2Score != null,
+    );
+
+    if (match.status === "completed" && !hasScore && !hasFinishedGames && !hasPeriodScores) {
+      embed.addFields({ name: "Score", value: "Result unavailable", inline: true });
+    } else {
+      let scoreValue = `**${match.team1Score ?? 0} - ${match.team2Score ?? 0}**`;
+      if (details?.clock && match.status === "live") {
+        scoreValue += `\n${details.clock}`;
+      }
+      embed.addFields({ name: "Score", value: scoreValue, inline: true });
     }
-    embed.addFields({ name: "Score", value: scoreValue, inline: true });
+
+    if (details?.team1Kills != null || details?.team2Kills != null) {
+      embed.addFields({
+        name: "Kills",
+        value: `**${details.team1Kills ?? 0} - ${details.team2Kills ?? 0}**`,
+        inline: true,
+      });
+    }
 
     // Esports: map-by-map breakdown
     if (details?.games && details.games.length > 0) {
@@ -65,7 +99,7 @@ export function buildMatchEmbed(match: Match): EmbedBuilder {
   if (match.status === "upcoming") {
     embed.addFields({
       name: "Starts",
-      value: `<t:${Math.floor(match.startTime.getTime() / 1000)}:R>`,
+      value: `<t:${Math.floor(new Date(match.startTime).getTime() / 1000)}:R>`,
       inline: true,
     });
   }
@@ -88,19 +122,27 @@ export function buildMatchWithOddsEmbed(
 ): EmbedBuilder {
   const embed = buildMatchEmbed(match);
 
-  const moneylineOdds = matchOdds.filter((o) => o.market === "moneyline");
-  if (moneylineOdds.length > 0) {
-    const oddsLines = moneylineOdds
-      .slice(0, 5)
-      .map(
-        (o) =>
-          `**${o.bookmaker}**: ${formatOdds(o.team1Odds, oddsFormat)} / ${formatOdds(o.team2Odds, oddsFormat)}${o.drawOdds ? ` / ${formatOdds(o.drawOdds, oddsFormat)}` : ""}`,
-      )
-      .join("\n");
-
-    const label = oddsFormat === "american" ? "Odds (American)" : "Odds (Moneyline)";
-    embed.addFields({ name: label, value: oddsLines });
+  if (matchOdds.length === 0) {
+    embed.addFields({ name: "Odds", value: "No odds available" });
+    return embed;
   }
+
+  // Try moneyline first, fallback to any available market
+  let oddsToShow = matchOdds.filter((o) => o.market === "moneyline");
+  if (oddsToShow.length === 0) {
+    oddsToShow = matchOdds.slice(0, 5);
+  }
+
+  const oddsLines = oddsToShow
+    .slice(0, 5)
+    .map(
+      (o) =>
+        `**${o.bookmaker}** (${o.market}): ${formatOdds(o.team1Odds, oddsFormat)} / ${formatOdds(o.team2Odds, oddsFormat)}${o.drawOdds ? ` / ${formatOdds(o.drawOdds, oddsFormat)}` : ""}`,
+    )
+    .join("\n");
+
+  const label = oddsFormat === "american" ? "Odds (American)" : "Odds";
+  embed.addFields({ name: label, value: oddsLines });
 
   return embed;
 }
@@ -123,7 +165,18 @@ function formatSubGames(
 
       if (winner) {
         const icon = winner === team1Name ? ":small_blue_diamond:" : ":small_orange_diamond:";
-        return `${label}: ${icon} **${winner}**${duration}`;
+        let statPart = "";
+        if (g.team1Score != null || g.team2Score != null) {
+          statPart += ` (${g.team1Score ?? 0}-${g.team2Score ?? 0})`;
+        }
+        if (g.team1Kills != null || g.team2Kills != null) {
+          statPart += ` [K ${g.team1Kills ?? 0}-${g.team2Kills ?? 0}]`;
+        }
+        return `${label}: ${icon} **${winner}**${statPart}${duration}`;
+      }
+
+      if (g.team1Score != null || g.team2Score != null) {
+        return `${label}: ${g.team1Score ?? 0}-${g.team2Score ?? 0}${duration}`;
       }
 
       return `${label}: Finished${duration}`;

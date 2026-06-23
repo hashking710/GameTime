@@ -151,6 +151,10 @@ export abstract class BaseCollector {
             eq(matches.status, "live"),
             eq(matches.game, game),
             lte(matches.startTime, cutoff),
+            sql`(
+              ${matches.team1Score} IS NOT NULL
+              OR ${matches.team2Score} IS NOT NULL
+            )`,
           ),
         );
     }

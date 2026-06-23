@@ -1,6 +1,5 @@
 import {
   loadEnv,
-  createLogger,
   onShutdown,
   validatePandaScoreApiKey,
 } from "@gametime/shared";
@@ -18,7 +17,6 @@ const env = loadEnv(
   }),
 );
 
-const logger = createLogger("collector-odds");
 const db = getDb(env.DATABASE_URL);
 const redis = getRedis(env.REDIS_URL);
 
@@ -30,8 +28,6 @@ const collector = new OddsCollector(
 );
 await validatePandaScoreApiKey(env.PANDASCORE_API_KEY, "collector-odds");
 collector.start();
-
-logger.info("Odds collector started");
 
 onShutdown(async () => {
   redis.disconnect();

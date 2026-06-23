@@ -1,4 +1,4 @@
-import { type Game, MatchStatus, type UnifiedMatch } from "@gametime/shared";
+import { type Game, MatchStatus, type UnifiedMatch, sanitizeImageUrl } from "@gametime/shared";
 
 export interface SportsDbRawEvent {
   idEvent: string;
@@ -13,6 +13,8 @@ export interface SportsDbRawEvent {
   intAwayScore: string | null;
   strStatus: string | null;
   strVideo: string | null;
+  strHomeTeamBadge: string | null;
+  strAwayTeamBadge: string | null;
 }
 
 export const SPORTSDB_LEAGUE_MAP: Record<string, Game> = {
@@ -33,6 +35,9 @@ export function normalizeSportsDbEvent(
   raw: SportsDbRawEvent,
   game: Game,
 ): UnifiedMatch {
+  const team1Logo = sanitizeImageUrl(raw.strHomeTeamBadge);
+  const team2Logo = sanitizeImageUrl(raw.strAwayTeamBadge);
+
   const startTime = raw.strTimestamp
     ? new Date(raw.strTimestamp)
     : new Date(`${raw.dateEvent}T${raw.strTime || "00:00:00"}Z`);
@@ -59,7 +64,11 @@ export function normalizeSportsDbEvent(
     startTime,
     status,
     streamUrl: raw.strVideo ?? undefined,
-    details: { externalEventId: raw.idEvent },
+    details: {
+      externalEventId: raw.idEvent,
+      ...(team1Logo ? { team1Logo } : {}),
+      ...(team2Logo ? { team2Logo } : {}),
+    },
     source: "sportsdb",
     sourceId: raw.idEvent,
   };

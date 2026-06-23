@@ -37,8 +37,17 @@ export default {
       )
       .limit(25);
 
+    // Deduplicate by display name + game to avoid showing same team multiple times
+    const seen = new Set<string>();
+    const unique = results.filter((t) => {
+      const key = `${t.name}:${t.game}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
     await interaction.respond(
-      results.map((t) => ({
+      unique.map((t) => ({
         name: `${t.name} (${t.game})`.slice(0, 100),
         value: t.id,
       })),

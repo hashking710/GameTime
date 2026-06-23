@@ -1,7 +1,7 @@
 export const CacheKeys = {
   liveMatches: () => "matches:live",
   upcomingMatches: () => "matches:upcoming",
-  todayMatches: () => "matches:today",
+  todayMatches: (timezone = "UTC", date = "") => `matches:today:${timezone}:${date}`,
   matchesByGame: (game: string) => `matches:game:${game}`,
   match: (id: string) => `match:${id}`,
   matchOdds: (matchId: string) => `odds:match:${matchId}`,

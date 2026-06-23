@@ -3,7 +3,6 @@ import type { matches } from "@gametime/db";
 import { normalizeTeamName } from "./team-name";
 
 type Match = InferSelectModel<typeof matches>;
-const TIME_BUCKET_MS = 2 * 60 * 60 * 1000;
 
 const SOURCE_PRIORITY: Record<string, number> = {
   pandascore: 10,
@@ -33,7 +32,18 @@ export function deduplicateMatches(all: Match[]): Match[] {
     const newHasDetails = match.details != null;
     const existingHasScore = (existing.team1Score ?? 0) + (existing.team2Score ?? 0) > 0;
     const newHasScore = (match.team1Score ?? 0) + (match.team2Score ?? 0) > 0;
+    
+    // Check for image/logo data in both matches
+    const existingHasImages = hasImages(existing);
+    const newHasImages = hasImages(match);
 
+    // Prefer match with images (especially for esports like Valorant)
+    if (newHasImages && !existingHasImages) {
+      groups.set(key, match);
+      continue;
+    }
+
+    // If both have or both lack images, use other criteria
     if (
       (newHasDetails && !existingHasDetails) ||
       (newHasScore && !existingHasScore) ||
@@ -46,40 +56,24 @@ export function deduplicateMatches(all: Match[]): Match[] {
   return Array.from(groups.values());
 }
 
-function getDedupKey(match: Match): string {
-  const externalId = findExternalEventId(match.details);
-  if (externalId) {
-    return `${match.game}:external:${externalId}`;
+function hasImages(match: Match): boolean {
+  // Check for team logos in details
+  if (match.details) {
+    const details = match.details as Record<string, unknown>;
+    if (details.team1Logo || details.team2Logo) {
+      return true;
+    }
   }
-
-  const startMs = new Date(match.startTime).getTime();
-  const timeBucket = Number.isFinite(startMs)
-    ? Math.floor(startMs / TIME_BUCKET_MS)
-    : 0;
-  const names = [normalizeTeamName(match.team1), normalizeTeamName(match.team2)].sort();
-  return `${match.game}:${names[0]}:${names[1]}:${timeBucket}`;
+  return false;
 }
 
-function findExternalEventId(details: unknown): string | null {
-  if (!details || typeof details !== "object") return null;
-
-  const record = details as Record<string, unknown>;
-  const knownKeys = [
-    "externalEventId",
-    "eventId",
-    "event_id",
-    "matchId",
-    "match_id",
-    "fixtureId",
-    "fixture_id",
-    "gameId",
-  ];
-
-  for (const key of knownKeys) {
-    const value = record[key];
-    if (typeof value === "string" && value.trim()) return value.trim();
-    if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  }
-
-  return null;
+function getDedupKey(match: Match): string {
+  // Use date-based bucketing so same teams on same calendar day are deduplicated,
+  // regardless of exact time or source reporting delay
+  const startMs = new Date(match.startTime).getTime();
+  const date = Number.isFinite(startMs)
+    ? new Date(startMs).toISOString().split("T")[0]
+    : "1970-01-01";
+  const names = [normalizeTeamName(match.team1), normalizeTeamName(match.team2)].sort();
+  return `${match.game}:${names[0]}:${names[1]}:${date}`;
 }

@@ -2,12 +2,19 @@ import type { ChatInputCommandInteraction } from "discord.js";
 import { eq } from "drizzle-orm";
 import { users } from "@gametime/db";
 import { TIER_LIMITS, type TierLimits } from "@gametime/shared";
+import { isAdminUser } from "./admin";
 
 export async function getUserTier(
   interaction: ChatInputCommandInteraction,
 ): Promise<TierLimits> {
-  const { db } = interaction.client;
   const discordId = interaction.user.id;
+
+  // Admins always have premium access for testing
+  if (isAdminUser(discordId)) {
+    return TIER_LIMITS.premium;
+  }
+
+  const { db } = interaction.client;
 
   const userRows = await db
     .select()

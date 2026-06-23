@@ -1,6 +1,6 @@
 import { REST, Routes } from "discord.js";
 import { loadEnv } from "@gametime/shared";
-import { loadCommands } from "./commands/index";
+import { loadCommands } from "./commands/index.js";
 import { z } from "zod";
 
 const env = loadEnv(

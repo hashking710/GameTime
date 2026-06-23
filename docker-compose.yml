@@ -126,6 +126,24 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  collector-vlr:
+    build:
+      context: .
+      dockerfile: packages/collectors/vlr/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://gametime:gametime@postgres:5432/gametime
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
   # ── Odds Collector ──────────────────────────────────────
   collector-odds:
     build:

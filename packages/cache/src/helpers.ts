@@ -7,11 +7,21 @@ export async function getOrSet<T>(
   fetcher: () => Promise<T>,
   ttl: number = CacheTTL.DEFAULT,
 ): Promise<T> {
-  const cached = await redis.get(key);
-  if (cached) return JSON.parse(cached) as T;
+  try {
+    const cached = await redis.get(key);
+    if (cached) return JSON.parse(cached) as T;
+  } catch {
+    // Redis unavailable — fall through to fetcher
+  }
 
   const fresh = await fetcher();
-  await redis.set(key, JSON.stringify(fresh), "EX", ttl);
+
+  try {
+    await redis.set(key, JSON.stringify(fresh), "EX", ttl);
+  } catch {
+    // Redis unavailable — return fresh data uncached
+  }
+
   return fresh;
 }
 

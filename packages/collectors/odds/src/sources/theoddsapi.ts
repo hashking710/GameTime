@@ -10,6 +10,7 @@ const SPORT_KEY_MAP: Record<string, Game> = {
   icehockey_nhl: "nhl",
   soccer_epl: "soccer",
   soccer_usa_mls: "soccer",
+  soccer_fifa_world_cup: "soccer",
   mma_mixed_martial_arts: "ufc",
   tennis_atp_french_open: "tennis",
 };
@@ -20,6 +21,8 @@ const SPORTS_TO_FETCH = [
   "baseball_mlb",
   "icehockey_nhl",
   "soccer_epl",
+  "soccer_usa_mls",
+  "soccer_fifa_world_cup",
   "mma_mixed_martial_arts",
 ];
 

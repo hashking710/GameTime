@@ -6,6 +6,7 @@ import { z } from "zod";
 import { loadCommands } from "./commands/index";
 import { handleInteraction } from "./events/interaction-create";
 import { startWebhookServer } from "./webhook";
+import { initializeAdminUsers } from "./utils/admin";
 
 const env = loadEnv(
   z.object({
@@ -16,10 +17,14 @@ const env = loadEnv(
     KOFI_VERIFICATION_TOKEN: z.string().optional(),
     KOFI_URL: z.string().optional(),
     WEBHOOK_PORT: z.coerce.number().default(3000),
+    ADMIN_USER_IDS: z.string().optional(),
   }),
 );
 
 const logger = createLogger("bot");
+
+// Initialize admin users from environment
+initializeAdminUsers(env.ADMIN_USER_IDS);
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds],

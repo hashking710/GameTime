@@ -1,4 +1,4 @@
-import { loadEnv, createLogger, onShutdown } from "@gametime/shared";
+import { loadEnv, onShutdown } from "@gametime/shared";
 import { getDb } from "@gametime/db";
 import { getRedis } from "@gametime/cache";
 import { OpenDotaCollector } from "./collector";
@@ -11,7 +11,6 @@ const env = loadEnv(
   }),
 );
 
-const logger = createLogger("collector-opendota");
 const db = getDb(env.DATABASE_URL);
 const redis = getRedis(env.REDIS_URL);
 
@@ -22,8 +21,6 @@ const collector = new OpenDotaCollector(
   "*/10 * * * *",
 );
 collector.start();
-
-logger.info("OpenDota collector started");
 
 onShutdown(async () => {
   redis.disconnect();

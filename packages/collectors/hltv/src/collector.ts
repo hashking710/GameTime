@@ -5,6 +5,7 @@ import {
   type UnifiedMatch,
   type MatchDetails,
   type MatchSubGame,
+  sanitizeImageUrl,
 } from "@gametime/shared";
 
 const PANDASCORE_STATUS_MAP: Record<string, MatchStatus> = {
@@ -14,33 +15,44 @@ const PANDASCORE_STATUS_MAP: Record<string, MatchStatus> = {
   canceled: MatchStatus.COMPLETED,
 };
 
-interface PandaScoreMatchResponse {
-  id: number;
-  name: string;
-  status: string;
-  begin_at: string;
-  opponents: {
-    opponent: {
-      id: number;
-      name: string;
-      acronym: string;
-      image_url: string | null;
-    };
-  }[];
-  league: { id: number; name: string };
-  tournament: { name: string };
-  videogame: { slug: string; name: string };
-  results: { team_id: number; score: number }[];
-  streams_list?: { raw_url: string; language: string; main: boolean }[];
-  number_of_games: number;
-  match_type: string;
-  games?: {
-    position: number;
-    status: string;
-    finished: boolean;
-    length: number | null;
-    winner: { id: number | null; type: string } | null;
-  }[];
+type UnknownRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === "object" && value !== null;
+}
+
+function asString(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  return value.trim().length > 0 ? value : undefined;
+}
+
+function asNumber(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
+function asBoolean(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function getScoreEntryTeamId(entry: unknown): number | undefined {
+  if (!isRecord(entry)) return undefined;
+  return asNumber(entry.team_id) ?? asNumber(entry.id);
+}
+
+function getScoreEntryValue(entry: unknown, key: "score" | "kills"): number | undefined {
+  if (!isRecord(entry)) return undefined;
+  return asNumber(entry[key]);
 }
 
 export class PandaScoreMatchCollector extends BaseCollector {
@@ -58,7 +70,6 @@ export class PandaScoreMatchCollector extends BaseCollector {
   }
 
   async collect(): Promise<UnifiedMatch[]> {
-    this.logger.info("Fetching PandaScore esports matches...");
     const allMatches: UnifiedMatch[] = [];
 
     const endpoints = [
@@ -80,68 +91,134 @@ export class PandaScoreMatchCollector extends BaseCollector {
           continue;
         }
 
-        const matches = (await response.json()) as PandaScoreMatchResponse[];
+        const payload = await response.json();
+        const matches = asArray(payload);
 
         for (const match of matches) {
-          const game = PANDASCORE_GAME_MAP[match.videogame?.slug];
+          if (!isRecord(match)) continue;
+
+          const videogame = isRecord(match.videogame) ? match.videogame : undefined;
+          const gameSlug = asString(videogame?.slug);
+          if (!gameSlug) continue;
+
+          const game = PANDASCORE_GAME_MAP[gameSlug];
           if (!game) continue;
-          if (match.opponents.length < 2) continue;
 
-          const team1 = match.opponents[0].opponent;
-          const team2 = match.opponents[1].opponent;
-          if (!team1.name || !team2.name) continue;
+          const opponentEntries = asArray(match.opponents)
+            .map((entry) => (isRecord(entry) && isRecord(entry.opponent) ? entry.opponent : undefined))
+            .filter((entry): entry is UnknownRecord => isRecord(entry));
 
-          const stream = match.streams_list?.find(
-            (s) => s.main && s.language === "en",
-          ) ?? match.streams_list?.[0];
+          if (opponentEntries.length < 2) continue;
 
-          const team1Result = match.results?.find(
-            (r) => r.team_id === team1.id,
-          );
-          const team2Result = match.results?.find(
-            (r) => r.team_id === team2.id,
-          );
+          const team1 = opponentEntries[0];
+          const team2 = opponentEntries[1];
+
+          const team1Id = asNumber(team1.id);
+          const team2Id = asNumber(team2.id);
+          const team1Name = asString(team1.name);
+          const team2Name = asString(team2.name);
+          if (!team1Name || !team2Name) continue;
+
+          const streams = asArray(match.streams_list)
+            .filter((entry): entry is UnknownRecord => isRecord(entry));
+          const stream = streams.find(
+            (s) => asBoolean(s.main) === true && asString(s.language)?.toLowerCase() === "en",
+          ) ?? streams[0];
+
+          const results = asArray(match.results)
+            .filter((entry): entry is UnknownRecord => isRecord(entry));
+          const team1Result = team1Id === undefined
+            ? undefined
+            : results.find((r) => asNumber(r.team_id) === team1Id);
+          const team2Result = team2Id === undefined
+            ? undefined
+            : results.find((r) => asNumber(r.team_id) === team2Id);
+
+          const matchType = asString(match.match_type);
+          const numberOfGames = asNumber(match.number_of_games);
+          const matchId = asNumber(match.id);
 
           const details: MatchDetails = {
-            format: match.match_type === "best_of"
-              ? `bo${match.number_of_games}`
-              : match.match_type,
-            team1Logo: team1.image_url ?? undefined,
-            team2Logo: team2.image_url ?? undefined,
-            externalEventId: match.id,
+            format: matchType === "best_of" && numberOfGames
+              ? `bo${numberOfGames}`
+              : matchType,
+            team1Logo: sanitizeImageUrl(asString(team1.image_url)),
+            team2Logo: sanitizeImageUrl(asString(team2.image_url)),
+            externalEventId: matchId,
           };
 
-          if (match.games && match.games.length > 0) {
+          const matchGames = asArray(match.games)
+            .filter((entry): entry is UnknownRecord => isRecord(entry));
+          if (matchGames.length > 0) {
             const opponentMap = new Map<number, string>();
-            opponentMap.set(team1.id, team1.name);
-            opponentMap.set(team2.id, team2.name);
+            if (team1Id !== undefined) opponentMap.set(team1Id, team1Name);
+            if (team2Id !== undefined) opponentMap.set(team2Id, team2Name);
 
-            details.games = match.games.map((g): MatchSubGame => ({
-              position: g.position,
-              status: g.finished ? "finished" : g.status === "running" ? "running" : "not_started",
-              winnerName: g.winner?.id ? opponentMap.get(g.winner.id) : undefined,
-              duration: g.length ?? undefined,
-            }));
+            details.games = matchGames.map((g, index): MatchSubGame => {
+              const scoreEntries = asArray(g.scores).length > 0
+                ? asArray(g.scores)
+                : asArray(g.teams);
+              const team1Stats = scoreEntries.find((entry) => getScoreEntryTeamId(entry) === team1.id);
+              const team2Stats = scoreEntries.find((entry) => getScoreEntryTeamId(entry) === team2.id);
+
+              const gameStatus = asString(g.status)?.toLowerCase();
+              const gameFinished = asBoolean(g.finished) ?? gameStatus === "finished";
+              const winner = isRecord(g.winner) ? g.winner : undefined;
+              const winnerId = asNumber(winner?.id);
+
+              return {
+                position: asNumber(g.position) ?? index + 1,
+                status: gameFinished
+                  ? "finished"
+                  : gameStatus === "running"
+                  ? "running"
+                  : "not_started",
+                winnerName: winnerId !== undefined ? opponentMap.get(winnerId) : undefined,
+                duration: asNumber(g.length),
+                team1Score: getScoreEntryValue(team1Stats, "score"),
+                team2Score: getScoreEntryValue(team2Stats, "score"),
+                team1Kills: getScoreEntryValue(team1Stats, "kills"),
+                team2Kills: getScoreEntryValue(team2Stats, "kills"),
+              };
+            });
           }
+
+          const beginAt = asString(match.begin_at) ?? asString(match.scheduled_at);
+          if (!beginAt) continue;
+          const startTime = new Date(beginAt);
+          if (Number.isNaN(startTime.getTime())) continue;
+
+          const league = isRecord(match.league) ? match.league : undefined;
+          const tournament = isRecord(match.tournament) ? match.tournament : undefined;
+          const leagueName = asString(league?.name);
+          const tournamentName = asString(tournament?.name);
+          const tournamentLabel = leagueName && tournamentName
+            ? `${leagueName} - ${tournamentName}`
+            : leagueName ?? tournamentName ?? "Unknown tournament";
+
+          const statusKey = asString(match.status)?.toLowerCase();
+          const sourceId = matchId !== undefined ? String(matchId) : undefined;
+          if (!sourceId) continue;
+
+          const normalizedStatus = statusKey
+            ? PANDASCORE_STATUS_MAP[statusKey]
+            : undefined;
 
           allMatches.push({
             game,
-            team1Name: team1.name,
-            team2Name: team2.name,
-            team1Score: team1Result?.score,
-            team2Score: team2Result?.score,
-            tournament: match.tournament?.name
-              ? `${match.league.name} - ${match.tournament.name}`
-              : match.league.name,
-            startTime: new Date(match.begin_at),
-            status:
-              PANDASCORE_STATUS_MAP[match.status] ?? MatchStatus.UPCOMING,
-            streamUrl: stream?.raw_url,
+            team1Name,
+            team2Name,
+            team1Score: getScoreEntryValue(team1Result, "score"),
+            team2Score: getScoreEntryValue(team2Result, "score"),
+            tournament: tournamentLabel,
+            startTime,
+            status: normalizedStatus ?? MatchStatus.UPCOMING,
+            streamUrl: stream ? asString(stream.raw_url) : undefined,
             source: "pandascore",
-            sourceId: String(match.id),
+            sourceId,
             details,
-            team1Logo: team1.image_url ?? undefined,
-            team2Logo: team2.image_url ?? undefined,
+            team1Logo: sanitizeImageUrl(asString(team1.image_url)),
+            team2Logo: sanitizeImageUrl(asString(team2.image_url)),
           });
         }
       } catch (err) {
@@ -149,7 +226,7 @@ export class PandaScoreMatchCollector extends BaseCollector {
       }
     }
 
-    this.logger.info({ count: allMatches.length }, "Fetched PandaScore matches");
+    this.logger.debug({ count: allMatches.length }, "Fetched PandaScore matches");
     return allMatches;
   }
 }

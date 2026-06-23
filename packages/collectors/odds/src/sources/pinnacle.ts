@@ -207,6 +207,6 @@ export async function fetchPinnacleOdds(): Promise<UnifiedOdds[]> {
     }
   }
 
-  logger.info({ count: results.length }, "Fetched Pinnacle odds");
+  logger.debug({ count: results.length }, "Fetched Pinnacle odds");
   return results;
 }

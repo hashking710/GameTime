@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { Game } from "../types/game";
-import { MatchStatus } from "../types/match";
-import { OddsMarket } from "../types/odds";
+import { Game } from "../types/game.js";
+import { MatchStatus } from "../types/match.js";
+import { OddsMarket } from "../types/odds.js";
 
 const gameValues = Object.values(Game) as [string, ...string[]];
 const matchStatusValues = Object.values(MatchStatus) as [string, ...string[]];

@@ -21,7 +21,6 @@ export class OpenDotaCollector extends BaseCollector {
   private readonly apiUrl = "https://api.opendota.com/api";
 
   async collect(): Promise<UnifiedMatch[]> {
-    this.logger.info("Fetching OpenDota matches...");
     const matches: UnifiedMatch[] = [];
 
     try {
@@ -77,12 +76,14 @@ export class OpenDotaCollector extends BaseCollector {
             game: "dota2",
             team1Name: radiantName,
             team2Name: direName,
-            team1Score: m.radiant_score,
-            team2Score: m.dire_score,
             tournament: m.league_name || "Live Match",
             startTime: new Date(),
             status: MatchStatus.LIVE,
-            details: { externalEventId: m.match_id },
+            details: {
+              externalEventId: m.match_id,
+              team1Kills: m.radiant_score,
+              team2Kills: m.dire_score,
+            },
             source: "opendota",
             sourceId: `live_${m.match_id}`,
           });
@@ -97,7 +98,7 @@ export class OpenDotaCollector extends BaseCollector {
       this.logger.error({ err }, "OpenDota live error");
     }
 
-    this.logger.info({ count: matches.length }, "Fetched OpenDota matches");
+    this.logger.debug({ count: matches.length }, "Fetched OpenDota matches");
     return matches;
   }
 }

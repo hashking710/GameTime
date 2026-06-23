@@ -13,6 +13,10 @@ export interface MatchSubGame {
   status: "finished" | "running" | "not_started";
   winnerName?: string;
   duration?: number;
+  team1Score?: number;
+  team2Score?: number;
+  team1Kills?: number;
+  team2Kills?: number;
 }
 
 export interface MatchPeriod {
@@ -27,6 +31,8 @@ export interface MatchDetails {
   periods?: MatchPeriod[];
   clock?: string;
   situation?: string;
+  team1Kills?: number;
+  team2Kills?: number;
   team1Logo?: string;
   team2Logo?: string;
   externalEventId?: string | number;

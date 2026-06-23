@@ -76,13 +76,19 @@ export async function checkUpsetAlerts(
 
       try {
         const user = await client.users.fetch(discordId);
+        const messageLines = [
+          `**Upset Alert!** ${emoji}`,
+          "",
+          `**${winningTeam}** (${underdogOdds.toFixed(2)} underdog) is beating **${losingTeam}** ${t1Score}-${t2Score}!`,
+          `Game: ${match.game.toUpperCase()} — ${match.tournament}`,
+        ];
+
+        if (match.streamUrl) {
+          messageLines.push(`[Watch Live](${match.streamUrl})`);
+        }
+
         await user.send({
-          content: [
-            `**Upset Alert!** ${emoji}`,
-            "",
-            `**${winningTeam}** (${underdogOdds.toFixed(2)} underdog) is beating **${losingTeam}** ${t1Score}-${t2Score}!`,
-            `Game: ${match.game.toUpperCase()} — ${match.tournament}`,
-          ].join("\n"),
+          content: messageLines.join("\n"),
         });
         logger.info({ discordId, matchId: match.id }, "Upset alert sent");
       } catch {
@@ -174,14 +180,20 @@ export async function checkLineMovementAlerts(
 
       try {
         const user = await client.users.fetch(discordId);
+        const messageLines = [
+          `**Line Movement Alert!** ${emoji}`,
+          "",
+          `**${row.matches.team1}** vs **${row.matches.team2}**`,
+          `${row.odds.bookmaker}: **${biggerShiftTeam}** odds ${direction} from ${oldOdds.toFixed(2)} → ${newOdds.toFixed(2)}`,
+          `Game: ${row.matches.game.toUpperCase()} — ${row.matches.tournament}`,
+        ];
+
+        if (row.matches.streamUrl) {
+          messageLines.push(`[Watch Live](${row.matches.streamUrl})`);
+        }
+
         await user.send({
-          content: [
-            `**Line Movement Alert!** ${emoji}`,
-            "",
-            `**${row.matches.team1}** vs **${row.matches.team2}**`,
-            `${row.odds.bookmaker}: **${biggerShiftTeam}** odds ${direction} from ${oldOdds.toFixed(2)} → ${newOdds.toFixed(2)}`,
-            `Game: ${row.matches.game.toUpperCase()} — ${row.matches.tournament}`,
-          ].join("\n"),
+          content: messageLines.join("\n"),
         });
         logger.info({ discordId, matchId: row.odds.matchId }, "Line movement alert sent");
       } catch {

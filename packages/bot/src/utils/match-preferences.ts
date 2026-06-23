@@ -61,7 +61,7 @@ export function sortMatchesByPreferences(
 
   scored.sort((a, b) => {
     if (a.score !== b.score) return a.score - b.score;
-    return a.match.startTime.getTime() - b.match.startTime.getTime();
+    return new Date(a.match.startTime).getTime() - new Date(b.match.startTime).getTime();
   });
 
   return scored.map((entry) => entry.match);

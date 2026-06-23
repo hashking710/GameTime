@@ -3,7 +3,13 @@ import { matches, teams, teamAliases } from "@gametime/db";
 import type { Database } from "@gametime/db";
 import type { RedisClient } from "@gametime/cache";
 import { invalidatePattern } from "@gametime/cache";
-import { createLogger, type Game, type MatchDetails, type MatchPeriod } from "@gametime/shared";
+import {
+  createLogger,
+  type Game,
+  type MatchDetails,
+  type MatchPeriod,
+  sanitizeImageUrl,
+} from "@gametime/shared";
 
 const logger = createLogger("espn-live");
 
@@ -36,7 +42,7 @@ const PERIOD_LABELS: Record<string, (n: number) => string> = {
 
 interface EspnCompetitor {
   homeAway: string;
-  team: { displayName: string; shortDisplayName: string };
+  team: { displayName: string; shortDisplayName: string; logo?: string };
   score: string;
   linescores?: { value: number }[];
 }
@@ -89,11 +95,15 @@ export async function updateLiveScores(db: Database, redis: RedisClient): Promis
 
         const homeScore = parseInt(home.score) || 0;
         const awayScore = parseInt(away.score) || 0;
+        const homeLogo = sanitizeImageUrl(home.team.logo);
+        const awayLogo = sanitizeImageUrl(away.team.logo);
 
         const details: MatchDetails = {
           clock: comp.status.type.shortDetail,
           situation: comp.status.type.description,
           externalEventId: event.id,
+          ...(homeLogo ? { team1Logo: homeLogo } : {}),
+          ...(awayLogo ? { team2Logo: awayLogo } : {}),
         };
 
         const homeLine = home.linescores;
@@ -200,7 +210,7 @@ export async function updateLiveScores(db: Database, redis: RedisClient): Promis
 
   if (totalUpdated > 0) {
     await invalidatePattern(redis, "matches:*");
-    logger.info({ updated: totalUpdated }, "ESPN live scores updated");
+    logger.debug({ updated: totalUpdated }, "ESPN live scores updated");
   }
 }
 
