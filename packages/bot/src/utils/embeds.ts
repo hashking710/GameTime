@@ -44,22 +44,26 @@ export function buildMatchEmbed(match: Match): EmbedBuilder {
     );
 
   if (match.status === "live" || match.status === "completed") {
-    const hasScore = match.team1Score != null || match.team2Score != null;
-    const hasFinishedGames = details?.games?.some(
-      (game) =>
-        game.status !== "not_started" ||
-        game.team1Score != null ||
-        game.team2Score != null ||
-        game.winnerName != null,
-    );
+    let t1Score = match.team1Score ?? 0;
+    let t2Score = match.team2Score ?? 0;
+
+    // Derive series score from map winners if the stored score is 0-0
+    if (t1Score === 0 && t2Score === 0 && details?.games) {
+      for (const g of details.games) {
+        if (g.winnerName === match.team1) t1Score++;
+        else if (g.winnerName === match.team2) t2Score++;
+      }
+    }
+
+    const hasAnyScore = t1Score > 0 || t2Score > 0;
     const hasPeriodScores = details?.periods?.some(
       (period) => period.team1Score != null || period.team2Score != null,
     );
 
-    if (match.status === "completed" && !hasScore && !hasFinishedGames && !hasPeriodScores) {
+    if (match.status === "completed" && !hasAnyScore && !hasPeriodScores) {
       embed.addFields({ name: "Score", value: "Result unavailable", inline: true });
     } else {
-      let scoreValue = `**${match.team1Score ?? 0} - ${match.team2Score ?? 0}**`;
+      let scoreValue = `**${t1Score} - ${t2Score}**`;
       if (details?.clock && match.status === "live") {
         scoreValue += `\n${details.clock}`;
       }
