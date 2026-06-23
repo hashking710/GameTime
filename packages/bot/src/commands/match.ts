@@ -7,11 +7,13 @@ import {
   ComponentType,
   MessageFlags,
   type ChatInputCommandInteraction,
+  type AutocompleteInteraction,
 } from "discord.js";
-import { eq, and, sql, desc, asc, gte } from "drizzle-orm";
+import { eq, and, sql, desc, asc, gte, or, inArray } from "drizzle-orm";
 import { matches, odds, matchWatches, users } from "@gametime/db";
 import { GAME_EMOJI, type MatchDetails, type MatchSubGame, type MatchPeriod } from "@gametime/shared";
 import { formatOdds, type OddsFormat } from "@gametime/shared";
+import { deduplicateMatches, getMergedMatchIds } from "../utils/dedup";
 
 export default {
   data: new SlashCommandBuilder()
@@ -20,34 +22,81 @@ export default {
     .addStringOption((opt) =>
       opt
         .setName("search")
-        .setDescription("Team name to search for")
-        .setRequired(true),
+        .setDescription("Search for a match")
+        .setRequired(true)
+        .setAutocomplete(true),
     ) as SlashCommandBuilder,
+
+  async autocomplete(interaction: AutocompleteInteraction) {
+    const focused = interaction.options.getFocused();
+    const { db } = interaction.client;
+
+    if (focused.length < 2) {
+      await interaction.respond([]);
+      return;
+    }
+
+    const results = await db
+      .select({
+        id: matches.id,
+        team1: matches.team1,
+        team2: matches.team2,
+        game: matches.game,
+        status: matches.status,
+        tournament: matches.tournament,
+      })
+      .from(matches)
+      .where(
+        sql`(${matches.team1} ILIKE ${"%" + focused + "%"} OR ${matches.team2} ILIKE ${"%" + focused + "%"} OR ${matches.tournament} ILIKE ${"%" + focused + "%"})`,
+      )
+      .orderBy(
+        sql`CASE WHEN ${matches.status} = 'live' THEN 0 WHEN ${matches.status} = 'upcoming' THEN 1 ELSE 2 END`,
+        asc(matches.startTime),
+      )
+      .limit(25);
+
+    const deduped = deduplicateMatches(results as any);
+
+    const statusIcon: Record<string, string> = { live: "🔴", upcoming: "📅", completed: "✅" };
+
+    await interaction.respond(
+      deduped.slice(0, 25).map((m) => ({
+        name: `${statusIcon[m.status] ?? ""} ${m.team1} vs ${m.team2} (${m.game.toUpperCase()})`.slice(0, 100),
+        value: m.id,
+      })),
+    );
+  },
 
   async execute(interaction: ChatInputCommandInteraction) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const { db } = interaction.client;
-    const search = interaction.options.getString("search", true);
+    const matchId = interaction.options.getString("search", true);
     const discordId = interaction.user.id;
 
-    const results = await db
-      .select()
-      .from(matches)
-      .where(
-        sql`(${matches.team1} ILIKE ${"%" + search + "%"} OR ${matches.team2} ILIKE ${"%" + search + "%"})`,
-      )
-      .orderBy(
-        sql`CASE WHEN ${matches.status} = 'live' THEN 0 WHEN ${matches.status} = 'upcoming' THEN 1 ELSE 2 END`,
-        desc(matches.startTime),
-      )
-      .limit(5);
-
-    if (results.length === 0) {
-      await interaction.editReply(`No matches found for "${search}".`);
-      return;
+    // Try as match ID first (from autocomplete), fall back to text search
+    let match;
+    const byId = await db.select().from(matches).where(eq(matches.id, matchId)).limit(1);
+    if (byId.length > 0) {
+      match = byId[0];
+    } else {
+      const results = await db
+        .select()
+        .from(matches)
+        .where(
+          sql`(${matches.team1} ILIKE ${"%" + matchId + "%"} OR ${matches.team2} ILIKE ${"%" + matchId + "%"})`,
+        )
+        .orderBy(
+          sql`CASE WHEN ${matches.status} = 'live' THEN 0 WHEN ${matches.status} = 'upcoming' THEN 1 ELSE 2 END`,
+          desc(matches.startTime),
+        )
+        .limit(1);
+      match = results[0];
     }
 
-    const match = results[0];
+    if (!match) {
+      await interaction.editReply("No match found.");
+      return;
+    }
     const details = match.details as MatchDetails | null;
     const emoji = GAME_EMOJI[match.game] ?? ":trophy:";
 
@@ -124,10 +173,11 @@ export default {
       embed.addFields({ name: "Stream", value: `[Watch Live](${match.streamUrl})`, inline: true });
     }
 
+    const oddsMatchIds = getMergedMatchIds(match.id);
     const matchOdds = await db
       .select()
       .from(odds)
-      .where(eq(odds.matchId, match.id));
+      .where(inArray(odds.matchId, oddsMatchIds));
 
     const moneyline = matchOdds.filter((o) => o.market === "moneyline");
     const spreads = matchOdds.filter((o) => o.market === "spread");
@@ -174,8 +224,8 @@ export default {
         .setDisabled(isWatching || match.status === "completed"),
     );
 
-    if (results.length > 1) {
-      results.slice(1, 4).forEach((m, i) => {
+    if (false as boolean) {
+      ([] as any[]).forEach((m) => {
         row.addComponents(
           new ButtonBuilder()
             .setCustomId(`switch_${m.id}`)
