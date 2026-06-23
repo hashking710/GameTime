@@ -133,10 +133,12 @@ export async function updateLiveScores(db: Database, redis: RedisClient): Promis
               sql`(
                 ${matches.team1} ILIKE '%' || ${home.team.shortDisplayName} || '%'
                 OR ${matches.team1} ILIKE '%' || ${home.team.displayName} || '%'
+                OR ${home.team.displayName} ILIKE '%' || ${matches.team1} || '%'
               )`,
               sql`(
                 ${matches.team2} ILIKE '%' || ${away.team.shortDisplayName} || '%'
                 OR ${matches.team2} ILIKE '%' || ${away.team.displayName} || '%'
+                OR ${away.team.displayName} ILIKE '%' || ${matches.team2} || '%'
               )`,
             ),
           )
@@ -159,10 +161,12 @@ export async function updateLiveScores(db: Database, redis: RedisClient): Promis
                 sql`(
                   ${matches.team1} ILIKE '%' || ${away.team.shortDisplayName} || '%'
                   OR ${matches.team1} ILIKE '%' || ${away.team.displayName} || '%'
+                  OR ${away.team.displayName} ILIKE '%' || ${matches.team1} || '%'
                 )`,
                 sql`(
                   ${matches.team2} ILIKE '%' || ${home.team.shortDisplayName} || '%'
                   OR ${matches.team2} ILIKE '%' || ${home.team.displayName} || '%'
+                  OR ${home.team.displayName} ILIKE '%' || ${matches.team2} || '%'
                 )`,
               ),
             )
