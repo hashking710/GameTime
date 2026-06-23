@@ -12,7 +12,16 @@ const ESPN_SPORTS: { sport: string; league: string; game: Game }[] = [
   { sport: "football", league: "nfl", game: "nfl" },
   { sport: "basketball", league: "nba", game: "nba" },
   { sport: "hockey", league: "nhl", game: "nhl" },
+  { sport: "soccer", league: "fifa.world", game: "soccer" },
+  { sport: "soccer", league: "eng.1", game: "soccer" },
+  { sport: "soccer", league: "esp.1", game: "soccer" },
+  { sport: "soccer", league: "ger.1", game: "soccer" },
+  { sport: "soccer", league: "ita.1", game: "soccer" },
+  { sport: "soccer", league: "fra.1", game: "soccer" },
   { sport: "soccer", league: "usa.1", game: "soccer" },
+  { sport: "soccer", league: "mex.1", game: "soccer" },
+  { sport: "soccer", league: "uefa.champions", game: "soccer" },
+  { sport: "soccer", league: "conmebol.libertadores", game: "soccer" },
   { sport: "mma", league: "ufc", game: "ufc" },
 ];
 
@@ -35,7 +44,9 @@ interface EspnCompetitor {
 interface EspnEvent {
   id: string;
   name: string;
+  date: string;
   competitions: {
+    date?: string;
     competitors: EspnCompetitor[];
     status: {
       type: { name: string; description: string; shortDetail: string; completed: boolean };
@@ -120,9 +131,9 @@ export async function updateLiveScores(db: Database, redis: RedisClient): Promis
           )
           .returning({ id: matches.id });
 
-        // If no match found with home=team1, try swapped
+        // If no match found, try swapped team order
         if (updated.length === 0) {
-          await db
+          const swapped = await db
             .update(matches)
             .set({
               team1Score: awayScore,
@@ -143,7 +154,37 @@ export async function updateLiveScores(db: Database, redis: RedisClient): Promis
                   OR ${matches.team2} ILIKE '%' || ${home.team.displayName} || '%'
                 )`,
               ),
-            );
+            )
+            .returning({ id: matches.id });
+
+          // If still no match, create it — ESPN is authoritative for live sports
+          if (swapped.length === 0) {
+            await db
+              .insert(matches)
+              .values({
+                game,
+                team1: home.team.displayName,
+                team2: away.team.displayName,
+                team1Score: homeScore,
+                team2Score: awayScore,
+                tournament: league.toUpperCase().replace(/\./g, " "),
+                startTime: new Date(event.date ?? event.competitions[0]?.date ?? Date.now()),
+                status: matchStatus,
+                details: details as Record<string, unknown>,
+                source: "espn",
+                sourceId: event.id,
+              })
+              .onConflictDoUpdate({
+                target: [matches.source, matches.sourceId],
+                set: {
+                  team1Score: sql`EXCLUDED.team1_score`,
+                  team2Score: sql`EXCLUDED.team2_score`,
+                  status: sql`EXCLUDED.status`,
+                  details: sql`EXCLUDED.details`,
+                  updatedAt: sql`NOW()`,
+                },
+              });
+          }
         }
 
         totalUpdated++;

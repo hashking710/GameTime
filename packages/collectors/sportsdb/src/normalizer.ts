@@ -21,6 +21,11 @@ export const SPORTSDB_LEAGUE_MAP: Record<string, Game> = {
   "4424": "mlb",
   "4380": "nhl",
   "4328": "soccer",
+  "4429": "soccer",
+  "4480": "soccer",
+  "4346": "soccer",
+  "4334": "soccer",
+  "4332": "soccer",
   "4443": "ufc",
 };
 

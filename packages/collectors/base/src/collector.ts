@@ -79,7 +79,11 @@ export abstract class BaseCollector {
     const seen = new Set<string>();
 
     for (const match of data) {
-      for (const teamName of [match.team1Name, match.team2Name]) {
+      const teamEntries = [
+        { name: match.team1Name, logo: match.team1Logo },
+        { name: match.team2Name, logo: match.team2Logo },
+      ];
+      for (const { name: teamName, logo } of teamEntries) {
         if (!teamName || teamName === "TBD") continue;
         const key = `${match.source}:${match.game}:${teamName}`;
         if (seen.has(key)) continue;
@@ -93,6 +97,7 @@ export abstract class BaseCollector {
             name: teamName,
             canonicalName: canonical,
             game: match.game,
+            logoUrl: logo,
             source: match.source,
             sourceId: `${match.source}_team_${teamName.toLowerCase().replace(/\s+/g, "_")}`,
           })

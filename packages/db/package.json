@@ -12,7 +12,7 @@
     }
   },
   "scripts": {
-    "build": "pnpm exec tsc",
+    "build": "tsc",
     "dev": "tsc -b --watch",
     "generate": "drizzle-kit generate",
     "migrate": "tsx src/migrate.ts",

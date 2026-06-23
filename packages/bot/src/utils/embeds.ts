@@ -33,10 +33,16 @@ const STATUS_COLOR = {
 
 export function buildMatchEmbed(match: Match): EmbedBuilder {
   const emoji = GAME_EMOJI[match.game] ?? ":trophy:";
+  const details = match.details as MatchDetails | null;
   const embed = new EmbedBuilder()
     .setTitle(`${emoji} ${match.team1} vs ${match.team2}`)
-    .setColor(STATUS_COLOR[match.status as keyof typeof STATUS_COLOR])
-    .addFields(
+    .setColor(STATUS_COLOR[match.status as keyof typeof STATUS_COLOR]);
+
+  if (details?.team1Logo) {
+    embed.setThumbnail(details.team1Logo);
+  }
+
+  embed.addFields(
       { name: "Game", value: match.game.toUpperCase(), inline: true },
       { name: "Tournament", value: match.tournament, inline: true },
       {
@@ -47,8 +53,6 @@ export function buildMatchEmbed(match: Match): EmbedBuilder {
     );
 
   if (match.status === "live" || match.status === "completed") {
-    const details = match.details as MatchDetails | null;
-
     let scoreValue = `**${match.team1Score ?? 0} - ${match.team2Score ?? 0}**`;
     if (details?.clock && match.status === "live") {
       scoreValue += `\n${details.clock}`;

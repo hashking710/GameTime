@@ -12,7 +12,7 @@
     }
   },
   "scripts": {
-    "build": "pnpm exec tsc",
+    "build": "tsc",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

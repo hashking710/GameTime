@@ -119,6 +119,8 @@ export class PandaScoreMatchCollector extends BaseCollector {
             format: match.match_type === "best_of"
               ? `bo${match.number_of_games}`
               : match.match_type,
+            team1Logo: team1.image_url ?? undefined,
+            team2Logo: team2.image_url ?? undefined,
           };
 
           if (match.games && match.games.length > 0) {
@@ -150,6 +152,8 @@ export class PandaScoreMatchCollector extends BaseCollector {
             source: "pandascore",
             sourceId: String(match.id),
             details,
+            team1Logo: team1.image_url ?? undefined,
+            team2Logo: team2.image_url ?? undefined,
           });
         }
       } catch (err) {

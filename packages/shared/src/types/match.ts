@@ -27,6 +27,8 @@ export interface MatchDetails {
   periods?: MatchPeriod[];
   clock?: string;
   situation?: string;
+  team1Logo?: string;
+  team2Logo?: string;
 }
 
 export interface UnifiedMatch {
@@ -42,4 +44,6 @@ export interface UnifiedMatch {
   source: string;
   sourceId: string;
   details?: MatchDetails;
+  team1Logo?: string;
+  team2Logo?: string;
 }
