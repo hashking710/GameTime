@@ -167,12 +167,13 @@ function formatSubGames(
   return games
     .map((g) => {
       const label = `Map ${g.position}`;
-      const effectiveStatus = matchCompleted && (g.status === "running" || g.status === "not_started")
-        ? "finished"
-        : g.status;
+      const wasPlayed = g.winnerName || g.duration || g.team1Score != null || g.team2Score != null;
 
-      if (!matchCompleted && effectiveStatus === "not_started") return `${label}: -`;
-      if (effectiveStatus === "running") return `${label}: :red_circle: **LIVE**`;
+      if (g.status === "not_started" && !matchCompleted) return `${label}: -`;
+      if (g.status === "running" && !matchCompleted) return `${label}: :red_circle: **LIVE**`;
+
+      // Completed match: skip maps that were never played
+      if (matchCompleted && !wasPlayed) return null;
 
       const winner = g.winnerName;
       const duration = g.duration
@@ -195,8 +196,9 @@ function formatSubGames(
         return `${label}: ${g.team1Score ?? 0}-${g.team2Score ?? 0}${duration}`;
       }
 
-      return `${label}: Finished${duration}`;
+      return `${label}: Played${duration}`;
     })
+    .filter((line): line is string => line !== null)
     .join("\n");
 }
 
